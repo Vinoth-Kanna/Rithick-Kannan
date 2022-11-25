@@ -1,0 +1,1543 @@
+Option Explicit
+
+Sub SearchnInsertRows()
+Dim lastrow As Long
+Dim Rng As Range, c As Range
+Dim lrow As Long, lastrw As Long
+Dim sh1 As Worksheet, sh2 As Worksheet
+Dim fndcol As Integer, fndtxt As String
+Dim i As Integer
+Dim rg As Range, emp_name As String
+Dim fdtxt As Object
+Dim frow As Long, dlastrw As Long
+
+With Application
+.ScreenUpdating = False
+.DisplayAlerts = False
+End With
+
+Set sh1 = ThisWorkbook.Sheets("Data_Sheet")
+Set sh2 = ThisWorkbook.Sheets("Summary")
+
+If sh1.Range("A1") = "" Then
+    sh1.Range("A:A").EntireColumn.Delete
+End If
+
+sh2.Activate
+lrow = sh2.Range("B15", Range("B15").End(xlDown)).Count
+    
+For fndcol = 1 To lrow
+    fndtxt = sh2.Cells(fndcol + 14, 2).Value
+    ' loop through all cells in column A and copy below's cell to sheet1
+    sh1.Activate
+    lastrow = sh1.Cells(Rows.Count, "A").End(xlUp).Row
+    Set Rng = sh1.Range("C2:C" & lastrow)
+    
+    'For Each C In rng
+    Dim rfnd As Object
+        With Rng
+        Set rfnd = .Find(what:=fndtxt, LookAt:=xlWhole, MatchCase:=True)
+        End With
+        If rfnd Is Nothing Then
+'            .Range(Cells(C.Row + 1, 1), Cells(C.Row + 8, 8)).EntireRow.Insert
+            'MsgBox fndtxt & " " & rfnd.Address
+            'MsgBox "not matching"
+            sh1.Activate
+            sh1.Range("a" & lastrow).Select
+            sh1.Range("a" & lastrow + 1, Cells(lastrow + 5, 1)).Value = sh2.Cells(fndcol + 14, 1).Value
+            sh1.Range("B" & lastrow + 1).Value = "Monday"
+            sh1.Range("B" & lastrow + 2).Value = "Tuesday"
+            sh1.Range("B" & lastrow + 3).Value = "Wednesday"
+            sh1.Range("B" & lastrow + 4).Value = "Thursday"
+            sh1.Range("B" & lastrow + 5).Value = "Friday"
+            sh1.Range("C" & lastrow + 1, Cells(lastrow + 5, 3)).Value = sh2.Cells(fndcol + 14, 2).Value
+            
+        End If
+    'Next C
+
+Next
+
+sh1.Activate
+Set rg = sh1.Range("a1").CurrentRegion
+    sh1.Sort.SortFields.Clear
+    sh1.Sort.SortFields.add Key:=Range("A1"), SortOn:=xlSortOnValues, Order:=xlAscending, _
+    DataOption:=xlSortNormal
+    sh1.Sort.SortFields.add Key:=Range( _
+        "B1"), SortOn:=xlSortOnValues, Order:=xlAscending, CustomOrder:= _
+        "Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday", DataOption:= _
+        xlSortNormal
+    With sh1.Sort
+        .SetRange rg
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+
+
+sh2.Activate
+
+'sh2.Range("A12:B12", Range("A12:B12").End(xlDown)).Copy
+'sh2.Range("I14").PasteSpecial Paste:=xlPasteValues
+
+lastrw = sh2.Range("A" & Rows.Count).End(xlUp).Row
+
+sh2.Range("A" & 16, "AB" & 16).Copy
+        sh2.Range("A" & 16, "AB" & lastrw).Select
+        Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+            SkipBlanks:=False, Transpose:=False
+        Application.CutCopyMode = False
+    sh2.Range("A" & lastrw, "AB" & lastrw).Select
+    
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+        End With
+        
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    With Selection.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Selection.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+    sh2.Range("A" & lastrw + 1, "AB" & lastrw + 3).Select
+    Selection.Clear
+    With Selection.Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+    
+Call updatedformula
+
+Application.DisplayAlerts = False
+
+End Sub
+
+
+Sub updatedformula()
+Dim sh1 As Worksheet
+Dim sh2 As Worksheet
+Dim lastrow As Long, lrow As Long
+Set sh1 = ThisWorkbook.Sheets("Summary")
+Set sh2 = ThisWorkbook.Sheets("Data_Sheet")
+
+With Application
+.ScreenUpdating = False
+.DisplayAlerts = False
+End With
+
+sh1.Activate
+lrow = sh1.Range("A15", Range("A15")).End(xlDown).Row
+lastrow = sh2.Cells(Rows.Count, "A").End(xlUp).Row
+
+sh2.Range("d2:d" & lastrow).FormulaR1C1 = "=IFERROR(VLOOKUP(RC[-1],Summary!C2:C7,MATCH(Data_Sheet!RC[-2],Summary!R13C3:R13C7,0)+1,0),0)"
+'sh2.Range("E2:E" & lastrow).FormulaR1C1 = "=IF(RC[-3]=""Monday"",SUMIFS(Monday,Empname,RC[-2])/60,IF(RC[-3]=""Tuesday"",SUMIFS(Tuesday,Empname,RC[-2])/60,IF(RC[-3]=""Wednesday"",SUMIFS(Wednesday,Empname,RC[-2])/60,IF(RC[-3]=""Thursday"",SUMIFS(Thursday,Empname,RC[-2])/60,IF(RC[-3]=""Friday"",SUMIFS(Friday,Empname,RC[-2])/60)))))"
+sh2.Range("E2:E" & lastrow).FormulaR1C1 = "=IFERROR(IF(RC[-3]=""Monday"",SUMIFS(Emp_hrs,Monday,RC3),IF(RC[-3]=""Tuesday"",SUMIFS(Emp_hrs,Tuesday,RC3),IF(RC[-3]=""Wednesday"",SUMIFS(Emp_hrs,Wednesday,RC3),IF(RC[-3]=""Thursday"",SUMIFS(Emp_hrs,Thursday,RC3),IF(RC[-3]=""Friday"",SUMIFS(Emp_hrs,Friday,RC3)))))),0)"
+sh2.Range("F2:F" & lastrow).FormulaR1C1 = "=IF(ISTEXT(RC[-2]),RC[-2],RC[-2]+RC[-1])"
+sh2.Range("H2:H" & lastrow).FormulaR1C1 = "=IFERROR(IF(ISTEXT(RC[-4]),RC[-4],IF(RC2=""Monday"",SUMIFS('Work Allocation'!C7,'Work Allocation'!C10,Data_Sheet!RC3)/60,IF(RC2=""Tuesday"",SUMIFS('Work Allocation'!C7,'Work Allocation'!C14,Data_Sheet!RC3)/60,IF(RC2=""Wednesday"",SUMIFS('Work Allocation'!C7,'Work Allocation'!C18,Data_Sheet!RC3)/60,IF(RC2=""Thursday"",SUMIFS('Work Allocation'!C7,'Work Allocation'!C22" & _
+        ",Data_Sheet!RC3)/60,IF(RC2=""Friday"",SUMIFS('Work Allocation'!C7,'Work Allocation'!C26,Data_Sheet!RC3)/60)))))),0)" & _
+        ""
+sh2.Range("I2:I" & lastrow).FormulaR1C1 = "=IF(ISTEXT(RC[-5]),""Leave"",RC[-5]-RC[-4])"
+sh2.Range("J2:J" & lastrow).FormulaR1C1 = "=IF(ISTEXT(RC[-6]),""Leave"",RC[-1]-RC[-2])"
+
+'sh2.Cells.Copy
+sh2.Range("A:F").Copy
+sh2.Range("a1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+
+'sh1.Range("H15:H" & lrow).FormulaR1C1 = _
+       "=IFERROR(SUMIFS(Data_Sheet!C8,Emp,Summary!RC2,Days,R13C),0)"
+    sh1.Activate
+    sh1.Range("I15:I" & lrow).FormulaR1C1 = _
+        "=IF(ISTEXT(RC[-1]),0,SUMIFS(Data_Sheet!C5,Emp,Summary!RC2,Days,Summary!R13C[-1]))"
+    
+    sh1.Range("J15:J" & lrow).FormulaR1C1 = _
+        "=IF(ISTEXT(RC[-2]),0,RC[-2]+RC[-1])"
+        
+'    sh1.Range("K15:K" & lrow).FormulaR1C1 = _
+       "=IFERROR(SUMIFS(Data_Sheet!C8,Emp,Summary!RC2,Days,R13C),0)"
+        
+    sh1.Range("L15:L" & lrow).FormulaR1C1 = _
+        "=IF(ISTEXT(RC[-1]),0,SUMIFS(Data_Sheet!C5,Emp,Summary!RC2,Days,Summary!R13C[-1]))"
+        
+    
+    sh1.Range("M15:M" & lrow).FormulaR1C1 = "=IF(ISTEXT(RC[-2]),0,RC[-2]+RC[-1])"
+    
+'    sh1.Range("N15:N" & lrow).FormulaR1C1 = _
+       "=IFERROR(SUMIFS(Data_Sheet!C8,Emp,Summary!RC2,Days,R13C),0)"
+    
+    sh1.Range("O15:O" & lrow).FormulaR1C1 = _
+        "=IF(ISTEXT(RC[-1]),0,SUMIFS(Data_Sheet!C5,Emp,Summary!RC2,Days,Summary!R13C[-1]))"
+        
+    sh1.Range("P15:P" & lrow).FormulaR1C1 = "=IF(ISTEXT(RC[-2]),0,RC[-2]+RC[-1])"
+    
+'    sh1.Range("Q15:Q" & lrow).FormulaR1C1 = _
+        "=IFERROR(SUMIFS(Data_Sheet!C8,Emp,Summary!RC2,Days,R13C),0)"
+    
+    sh1.Range("R15:R" & lrow).FormulaR1C1 = _
+         "=IF(ISTEXT(RC[-1]),0,SUMIFS(Data_Sheet!C5,Emp,Summary!RC2,Days,Summary!R13C[-1]))"
+        
+    sh1.Range("S15:S" & lrow).FormulaR1C1 = "=IF(ISTEXT(RC[-2]),0,RC[-2]+RC[-1])"
+    
+'    sh1.Range("T15:T" & lrow).FormulaR1C1 = _
+       "=IFERROR(SUMIFS(Data_Sheet!C8,Emp,Summary!RC2,Days,R13C),0)"
+    
+    sh1.Range("U15:U" & lrow).FormulaR1C1 = _
+        "=IF(ISTEXT(RC[-1]),0,SUMIFS(Data_Sheet!C5,Emp,Summary!RC2,Days,Summary!R13C[-1]))"
+        
+    sh1.Range("V15:V" & lrow).FormulaR1C1 = "=IF(ISTEXT(RC[-2]),0,RC[-2]+RC[-1])"
+    
+    sh1.Range("X15:X" & lrow).FormulaR1C1 = "=SUMIFS(RC8:RC22,R14C8:R14C22,""Total"")"
+    
+    sh1.Range("Z15:Z" & lrow).FormulaR1C1 = "=SUM(RC3:RC7)"
+    
+    sh1.Range("AB15:AB" & lrow).FormulaR1C1 = "=RC[-2]-RC[-4]"
+    
+    sh1.Range("AE5").Value = Application.WorksheetFunction.Sum(sh1.Range("AA21:AA" & lrow))
+    
+    sh1.Range("AF5").Value = Application.WorksheetFunction.Sum(sh1.Range("AC21:AC" & lrow))
+    
+    
+'sh1.Cells.Copy
+'sh1.Range("a1").PasteSpecial Paste:=xlPasteValues
+sh1.Range("A15").Select
+Application.CutCopyMode = False
+Application.DisplayAlerts = False
+End Sub
+
+
+Sub Remove_EmpName()
+Dim lrow As Long
+Dim lastrw As Long
+Dim rg As Range, i As Integer
+Dim fdtxt As Variant, empname As String
+Dim sh2 As Worksheet
+Set sh2 = ThisWorkbook.Sheets("Summary")
+
+lrow = sh2.Range("a" & Rows.Count).End(xlUp).Row
+sh2.Activate
+lastrw = sh2.Range("J14", Range("j14").End(xlDown)).Count
+Set rg = sh2.Range("B12:B" & lrow)
+
+For i = 1 To lastrw
+
+    empname = sh2.Cells(i + 13, 10).Value
+    
+    With rg
+        Set fdtxt = .Find(what:=empname, LookAt:=xlWhole, MatchCase:=True)
+    End With
+    
+    If fdtxt Is Nothing Then
+        sh2.Range(Cells(i + 13, 9), Cells(i + 13, 31)).Select
+        Selection.Delete Shift:=xlUp
+    End If
+    
+ Next
+
+lastrw = Range("J" & Rows.Count).End(xlUp).Row
+
+    Application.CutCopyMode = False
+    
+    sh2.Range("I" & lastrw, "AE" & lastrw).Select
+        
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    With Selection.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Selection.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Selection.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+    
+    sh2.Range("I" & lastrw + 1, "AE" & lastrw + 3).Select
+    Selection.Clear
+    With Selection.Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        
+        Selection.Borders(xlEdgeBottom).LineStyle = xlNone
+        Selection.Borders(xlEdgeRight).LineStyle = xlNone
+        Selection.Borders(xlInsideVertical).LineStyle = xlNone
+        Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+        Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+        Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+        Selection.Borders(xlEdgeLeft).LineStyle = xlNone
+        
+        With Selection.Interior
+            .Pattern = xlNone
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+        End With
+
+End Sub
+
+
+Sub addemp()
+Dim sh2 As Worksheet
+Dim lastrw As Long
+'lastrw = sh2.Range("J14", Range("j14").End(xlDown)).Row
+lastrw = Range("A12", Range("A12").End(xlDown)).Row
+Set sh2 = ThisWorkbook.Sheets("Summary")
+sh2.Range("A12:B12", Range("A12:B12").End(xlDown)).Copy
+sh2.Range("I14").PasteSpecial Paste:=xlPasteValues
+
+lastrw = Range("J" & Rows.Count).End(xlUp).Row
+sh2.Range("I" & lastrw - 1, "AE" & lastrw - 1).Copy
+        sh2.Range("I" & lastrw, "AE" & lastrw).Select
+        Selection.PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+            SkipBlanks:=False, Transpose:=False
+        Application.CutCopyMode = False
+        sh2.Range("I" & lastrw, "AE" & lastrw).Select
+        
+        With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+        End With
+End Sub
+
+
+Sub bordertest()
+
+Dim lastrw As Long
+'lastrw = sh2.Range("J14", Range("j14").End(xlDown)).Row
+lastrw = Range("J" & Rows.Count).End(xlUp).Row
+
+Range("I" & lastrw + 1, "AE" & lastrw + 3).Select
+
+With Selection.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    
+    Selection.Borders(xlEdgeBottom).LineStyle = xlNone
+    Selection.Borders(xlEdgeRight).LineStyle = xlNone
+    Selection.Borders(xlInsideVertical).LineStyle = xlNone
+    Selection.Borders(xlInsideHorizontal).LineStyle = xlNone
+    Selection.Borders(xlDiagonalDown).LineStyle = xlNone
+    Selection.Borders(xlDiagonalUp).LineStyle = xlNone
+    Selection.Borders(xlEdgeLeft).LineStyle = xlNone
+    With Selection.Interior
+        .Pattern = xlNone
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+End Sub
+
+
+
+
+
+
+
+
+
+Option Explicit
+Sub Auto_Task()
+Dim sh1 As Worksheet, sh2 As Worksheet
+Dim sh3 As Worksheet, sh4 As Worksheet
+Dim sh5 As Worksheet, sh6 As Worksheet
+Dim sh7 As Worksheet, rd As Integer
+Dim fndemp As String, rc
+Dim fndallocate, fndbrktime As Variant
+Dim fndemphrs, fndovrtime As Variant
+Dim fndbalhrs As Variant, fcat As String
+Dim Tname As String, date_type As String
+Dim wrk As Worksheet, lastrw As Long
+Dim col As Integer, ad As String
+Dim lastcl As Long, lcol As Long
+Dim i As Integer, j As Integer, day1 As String
+Dim lrow As Long, r As Integer, txt As String
+Dim cl As Integer, wd
+Dim wwk As String, fc As Integer
+Dim sklrow As Long, sklastcl As Long
+Dim dlastrw As Long, fd As Integer, tc As Integer
+Dim a As Integer, ftxt As String
+Dim phrs, rr As Range
+Dim k As Integer, skil As Integer
+Dim empname As String, balh As Variant
+Dim allocate, brktime As Variant
+Dim emphrs, ovrtime As Variant
+Dim balhrs As Variant, rfnd As Object
+Dim c, rg As Range, fndtxt As String
+Dim cuntt As Integer, empfnd As String
+Dim allocate1, brktime1 As Variant
+Dim emphrs1, ovrtime1 As Variant, ovr As Variant
+Dim balhrs1 As Variant, brk As Variant
+Dim fdd As Integer, pp As Long
+Dim procedureno, empclm As Integer
+Dim pn As Integer, hrs As Variant
+Dim ehrs, empallocate As Variant, ftxtovrtime As Variant
+Dim empcheck, ftxtbrktime As Variant
+Dim ftxtallocate As Variant, ftxtemphrs As Variant
+Dim ftxtbalhrs As Variant
+
+Set sh1 = ThisWorkbook.Sheets("Work Allocation")
+Set sh2 = ThisWorkbook.Sheets("Skills Matrix")
+Set sh3 = ThisWorkbook.Sheets("Tasks")
+Set sh4 = ThisWorkbook.Sheets("Process Type")
+Set sh5 = ThisWorkbook.Sheets("Summary")
+Set sh6 = ThisWorkbook.Sheets("Data_Sheet")
+Set sh7 = ThisWorkbook.Sheets("Date_split")
+
+With Application
+.ScreenUpdating = False
+.DisplayAlerts = False
+End With
+
+Call Clearcells
+
+'   Allocate the employee names with Date wise split into each process
+
+Call Split_days
+
+sh1.Activate
+Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+
+
+'   Allocate to process type with skills matrics
+
+sh3.Activate
+sh3.Range("B1:E1" & Range("B1048576").End(xlUp).Row).Copy
+sh4.Activate
+sh4.Range("A1").PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+:=False, Transpose:=False
+sh4.Range("A1").PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, SkipBlanks _
+:=False, Transpose:=False
+fdd = sh4.Range("1:1").Find(what:="Procedure Number").Offset(0, 1).Column
+Cells(1, fdd).Value = "Procedure No Check"
+
+Dim lrw As Long
+lrw = sh4.Range("A" & Rows.Count).End(xlUp).Row
+For pp = lrw To 2 Step -1
+    procedureno = Cells(pp, fdd - 1).Value
+    pn = InStr(1, Cells(pp, fdd - 1).Value, "&")
+    If procedureno = "N/A" Or procedureno = "" Then
+        Cells(pp, fdd).Value = 0
+        ElseIf pn = 0 Then
+        Cells(pp, fdd).Value = procedureno
+        Else
+        Cells(pp, fdd).Value = Left(procedureno, pn - 2)
+        Cells(pp + 1, fdd).EntireRow.Insert Shift:=xlUp
+        Cells(pp + 1, fdd).EntireRow.FillDown
+        Cells(pp, fdd).Value = Right(procedureno, pn - 2)
+    End If
+Next
+
+Application.CutCopyMode = False
+sh2.Activate
+sh2.Range("B1", Range("B1").End(xlToRight)).Copy
+sh4.Range("F2").PasteSpecial Paste:=xlPasteValues, Transpose:=True
+lrw = sh4.Range("A" & Rows.Count).End(xlUp).Row
+sh4.Range("G2:G" & lrw).FormulaR1C1 = "=IFERROR(IFERROR(LEFT(RC[-1],FIND(""."",RC[-1])-1),LEFT(RC[-1],FIND("" "",RC[-1])-1)),"""")"
+sh4.Range("H2:H" & lrw).FormulaR1C1 = "=IFERROR(INDEX(C6,MATCH(RC5,C7,0),1),0)"
+sh4.UsedRange.Copy
+sh4.Range("A1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+sh4.Range("H1").Value = "Skills Matrix"
+sh4.Range("F:G").Delete
+sh4.UsedRange.EntireColumn.AutoFit
+
+'   Employee names allocate to each every day
+
+sh3.Activate
+sh3.Range("B2:I2" & Range("B1048576").End(xlUp).Row).Copy
+sh1.Range("A2").PasteSpecial Paste:=xlPasteValues
+sh1.Range("A2").PasteSpecial Paste:=xlPasteFormats
+sh1.UsedRange.EntireColumn.AutoFit
+sh4.AutoFilterMode = False
+
+'   Days wise allocate the employee's hours
+
+For wd = 1 To 5
+    wwk = sh5.Cells(13, 2 + wd).Value
+    sh7.Activate
+    fc = sh7.Range("1:1").Find(what:=wwk).Column
+    sklrow = sh2.Range("a1048576").End(xlUp).Row
+    sklastcl = sh2.Cells(1, Columns.Count).End(xlToLeft).Column
+    
+    sh6.Activate
+    If sh6.Range("A1") <> "" Then
+    dlastrw = sh6.Range("A" & Rows.Count).End(xlUp).Row
+    sh6.Range("A:A").EntireColumn.Insert
+    sh6.Range("A2:A" & dlastrw).FormulaR1C1 = "=RC[2]&RC[3]"
+    End If
+    
+    sh2.Activate
+    sklrow = sh2.Range("a1048576").End(xlUp).Row
+    sh2.Range("A:A").EntireColumn.Insert
+    sh2.Range("a1").Value = wwk
+    sh2.Range("A2:A" & sklrow).FormulaR1C1 = "=VLOOKUP(R1C1&RC2,Data_Sheet!C:C[10],5,0)"
+    
+    sh1.Activate
+    For col = 1 To sklrow
+    sh1.Range("1:1").Find(what:="Allocation").Select
+    Selection.EntireColumn.Insert
+    Next
+    
+    '   Checking the process type match with skill matric
+    
+    sh1.Activate
+    Range("1:1").Find(what:="Time Allocated").Offset(0, 2).Select
+    ActiveCell.Value = "Process Type"
+    lrow = sh1.Range("a2", Range("a2").End(xlDown)).Count + 1
+    sh1.Range("I3:I" & lrow).FormulaR1C1 = "=IFERROR(VLOOKUP(RC1,'Process Type'!C1:C6,6,0),""Process Type Not Match With Skill Matric"")"
+    sh1.Range("I:I").Copy
+    sh1.Range("I:I").PasteSpecial Paste:=xlPasteValues
+    Application.CutCopyMode = False
+    
+    '   Process type and Skillset Matrix asign each employee's
+    
+    cl = 0
+    For i = 2 To sklrow
+    If IsNumeric(sh2.Cells(i, 1).Value) Then
+        sh1.Cells(1, i + 8 + cl).Value = sh2.Cells(i, 2).Value
+        sh1.Activate
+        
+            For j = 3 To lrow
+            txt = sh1.Cells(j, 9).Value
+            'sh1.Cells(j, i + 8 + cl).Value = Application.WorksheetFunction.IfError(Application.RandBetween(3, Application.HLookup(txt, sh2.Range("B:DS"), i, 0)), 0)
+            Dim ch As Integer
+            ch = Application.WorksheetFunction.IfError(Application.HLookup(txt, sh2.Range("B:DS"), i, 0), 0)
+            If ch >= 3 Then
+            sh1.Cells(j, i + 8 + cl).Value = ch
+            r = r + 1
+            Else
+            sh1.Cells(j, i + 8 + cl).Value = 0
+            End If
+            Next
+            
+    Else
+        sh4.Range("AK" & i).Value = sh2.Cells(i, 2).Value
+        'MsgBox sh2.Cells(i, 2).Value & " Employee leave on " & wwk, vbInformation
+        cl = -1
+    End If
+    Next
+    
+    sh2.Range("A:A").EntireColumn.Delete
+    sh6.Range("A:A").EntireColumn.Delete
+    
+    '   Employee hours calcuation
+    
+    sklrow = sh2.Range("a1048576").End(xlUp).Row
+    sklastcl = sh2.Cells(2, Columns.Count).End(xlToLeft).Column
+    lrow = sh1.Range("a" & Rows.Count).End(xlUp).Row
+    tc = sh1.Range("1:1").Find(what:="Time Allocated").Column
+    fd = sh1.Range("1:1").Find(what:="Allocation").Column
+    fd = fd + a
+    
+    For i = 3 To lrow
+    
+        sh1.Activate
+        ftxt = Application.WorksheetFunction.IfError(Application.VLookup(Cells(i, 1).Value, Sheets("Date_split").Range("A:Q"), fc, 0), "")
+        fcat = Cells(i, tc + 1).Value
+        Set rg = sh4.Range("AK1:AK" & sklrow)
+        fndemp = sh1.Cells(i, fd - a).Value
+        Set rr = sh1.Range(Cells(i, 10), Cells(i, 8 + sklrow))
+        
+        With rg
+        Set rfnd = .Find(what:=fndemp, LookAt:=xlWhole, MatchCase:=True)
+        End With
+        
+        '   Check the employes status category wise and allocation the employee's hours
+            
+            
+            If wwk <> "Monday" And fcat = "Fixed" And ftxt = "Yes" _
+            And rfnd Is Nothing Then
+            On Error Resume Next
+            phrs = Round(sh1.Cells(i, tc).Value / 60, 2)
+            On Error GoTo 0
+            Set rr = sh1.Range(Cells(i, 10), Cells(i, 8 + sklrow))
+            sh1.Range(Cells(i, 10), Cells(i, 8 + sklrow)).Select
+            fndallocate = Application.WorksheetFunction.IfError(Application.WorksheetFunction.Round(Application.WorksheetFunction.SumIfs(sh1.Range("G:G"), sh1.Columns(fd), fndemp) / 60, 2), "Leave")
+            fndemphrs = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("D:D"), sh6.Range("C:C"), fndemp, sh6.Range("B:B"), wwk), "Leave")
+            fndbrktime = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("E:E"), sh6.Range("C:C"), fndemp, sh6.Range("B:B"), wwk), "Leave")
+            fndovrtime = fndemphrs - fndbrktime
+            fndbalhrs = fndovrtime - fndallocate
+            
+                If ftxt = "Yes" And fndallocate <= fndovrtime And phrs <= fndbalhrs Then
+                Cells(i, fd).Value = fndemp
+                
+                ElseIf Application.WorksheetFunction.Sum(rr) > 0 Then
+                For Each c In rr
+                    If c >= 3 And c <= 4 Then
+                    cuntt = c.Column
+                    fndemp = Cells(1, cuntt).Value
+                    allocate1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.Round(Application.WorksheetFunction.SumIfs(sh1.Range("G:G"), sh1.Columns(fd), fndemp) / 60, 2), "Leave")
+                    emphrs1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("D:D"), sh6.Range("C:C"), fndemp, sh6.Range("B:B"), wwk), "Leave")
+                    brktime1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("E:E"), sh6.Range("C:C"), fndemp, sh6.Range("B:B"), wwk), "Leave")
+                    ovrtime1 = emphrs1 - brktime1
+                    balhrs1 = ovrtime1 - allocate1
+                    
+                    If ftxt = "Yes" And allocate1 <= ovrtime1 And phrs <= balhrs1 Then
+                    sh1.Cells(i, fd).Value = fndemp
+                    Exit For
+                    End If
+                    Else
+                    Cells(i, fd).Value = "Skillset not match"
+                    End If
+                Next
+                
+                ElseIf Application.WorksheetFunction.Sum(rr) = 0 Then
+                Cells(i, fd).Value = "Skillset not match"
+                Else
+                Cells(i, fd).Value = "Not Required"
+                Cells(i, fd + 1).Value = "*"
+                Cells(i, fd + 2).Value = "*"
+                Cells(i, fd + 3).Value = "*"
+                End If
+            
+        ElseIf fcat = "" Then
+            sh1.Range(Cells(i, fd - a), Cells(i, fd + 14)).Select
+            With Selection.Interior
+                .Pattern = xlSolid
+                .PatternColorIndex = xlAutomatic
+                .Color = 8421504
+                .TintAndShade = 0
+                .PatternTintAndShade = 0
+            End With
+            
+        ElseIf ftxt <> "Yes" And ftxt <> "No" Then
+            Cells(i, fd).Value = ftxt
+            ftxtallocate = Application.WorksheetFunction.IfError(Application.WorksheetFunction.Round(Application.WorksheetFunction.SumIfs(sh1.Range("G:G"), sh1.Columns(fd), ftxt) / 60, 2), "Leave")
+            ftxtemphrs = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("D:D"), sh6.Range("C:C"), ftxt, sh6.Range("B:B"), wwk), "Leave")
+            ftxtbrktime = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("E:E"), sh6.Range("C:C"), ftxt, sh6.Range("B:B"), wwk), "Leave")
+            ftxtovrtime = ftxtemphrs - ftxtbrktime
+            ftxtbalhrs = ftxtovrtime - ftxtallocate
+                If ftxtallocate <= ftxtovrtime And phrs <= ftxtbalhrs Then
+                Cells(i, fd).Value = ftxt
+                ElseIf ftxtemphrs = 0 Then
+                Cells(i, fd).Value = ftxt
+                Else
+                Cells(i, fd).Value = ftxt & " Work hours are already allocated, So please Change the employee name in Task sheets."
+                End If
+                
+                
+        ElseIf Application.WorksheetFunction.Sum(rr) = 0 Then
+            Cells(i, fd).Value = "Skillset not match"
+        
+        ElseIf ftxt = "No" Then
+            Cells(i, fd).Value = "Not Required"
+            Cells(i, fd + 1).Value = "*"
+            Cells(i, fd + 2).Value = "*"
+            Cells(i, fd + 3).Value = "*"
+        
+        ElseIf Application.WorksheetFunction.Sum(rr) = 0 Then
+            Cells(i, fd).Value = "Skillset not match"
+            
+        Else
+            
+            On Error Resume Next
+            phrs = Round(sh1.Cells(i, tc).Value / 60, 2)
+            On Error GoTo 0
+            
+randcheck:
+            rd = Int((12 - 1 + 1) * Rnd + 1)
+            k = 1
+            
+            sh1.Range(Cells(i, 10), Cells(i, 8 + sklrow + 2)).Select
+            sh1.Range(Cells(1, tc + 3), Cells(1, tc + sklrow + 1)).Select
+            empname = Application.IfError(Application.WorksheetFunction.Index(sh1.Range(Cells(1, 10), Cells(1, 8 + sklrow + 2)), 0, rd), 0)
+            'MsgBox rd & " " & empname
+            rc = sh1.Cells(i, tc + 2 + rd)
+            
+            If sh1.Cells(i, tc + 2 + rd).Value = 3 Or sh1.Cells(i, tc + 2 + rd) = 4 Then
+                sh1.Cells(i, fd).Value = empname
+            Else
+                GoTo randcheck
+            End If
+            
+            
+            
+            
+            empname = sh1.Cells(i, fd).Value
+            allocate = Application.WorksheetFunction.IfError(Application.WorksheetFunction.Round(Application.WorksheetFunction.SumIfs(sh1.Range("G:G"), sh1.Columns(fd), empname) / 60, 2), "Leave")
+            emphrs = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("D:D"), sh6.Range("C:C"), empname, sh6.Range("B:B"), wwk), "Leave")
+            brktime = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("E:E"), sh6.Range("C:C"), empname, sh6.Range("B:B"), wwk), "Leave")
+            ovrtime = emphrs - brktime
+            balhrs = ovrtime - allocate
+                        
+            
+            '   Check the employes hours and process type, then allocation the employees name respective columns
+            
+            If ftxt = "Yes" And allocate <= ovrtime And phrs <= balhrs Then
+                Cells(i, fd).Value = empname
+            
+            ElseIf Application.WorksheetFunction.Sum(rr) > 0 Then
+            
+            For Each c In rr
+                If c >= 3 And c <= 4 Then
+                cuntt = c.Column
+                empfnd = Cells(1, cuntt).Value
+                allocate1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.Round(Application.WorksheetFunction.SumIfs(sh1.Range("G:G"), sh1.Columns(fd), empfnd) / 60, 2), "Leave")
+                emphrs1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("D:D"), sh6.Range("C:C"), empfnd, sh6.Range("B:B"), wwk), "Leave")
+                brktime1 = Application.WorksheetFunction.IfError(Application.WorksheetFunction.SumIfs(sh6.Range("E:E"), sh6.Range("C:C"), empfnd, sh6.Range("B:B"), wwk), "Leave")
+                ovrtime1 = emphrs1 - brktime1
+                balhrs1 = ovrtime1 - allocate1
+            
+                If ftxt = "Yes" And allocate1 <= ovrtime1 And phrs <= balhrs1 Then
+                sh1.Cells(i, fd).Value = empfnd
+                Exit For
+                End If
+                Else
+                Cells(i, fd).Value = "Skillset not match"
+                End If
+            Next
+                
+            ElseIf Application.WorksheetFunction.Sum(rr) = 0 Then
+            Cells(i, fd).Value = "Skillset not match"
+            Else
+            Cells(i, fd).Value = "Not Required"
+            Cells(i, fd + 1).Value = "*"
+            Cells(i, fd + 2).Value = "*"
+            Cells(i, fd + 3).Value = "*"
+            End If
+            
+            
+            
+        End If
+    Next
+        
+    sh4.Range("AK:AK").Clear
+    ad = sh1.Range("1:1").Find(what:="Process Type").Address
+    sh1.Range(ad).Resize(1, sklrow).EntireColumn.Select
+    Selection.EntireColumn.Delete
+    Range("A1").Select
+    a = a + 4
+
+Next wd
+
+sh1.Cells.Copy
+Range("a1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+sh1.Range("A:R").Columns.AutoFit
+
+Call dateadd_updateFormatting
+
+Application.DisplayAlerts = True
+
+MsgBox "Auto allocation process has been done.", vbInformation
+
+End Sub
+
+Sub dateadd_updateFormatting()
+Dim sh1 As Worksheet
+Dim sh5 As Worksheet, sh6 As Worksheet
+Dim lrow As Long, wd As Long
+Dim wwk As Variant, fc As Integer
+Dim lastrw As Long, dlastrw As Long
+'   Allocate the days and formatting to each columns
+
+Set sh1 = ThisWorkbook.Sheets("Work Allocation")
+Set sh5 = ThisWorkbook.Sheets("Summary")
+Set sh6 = ThisWorkbook.Sheets("Data_Sheet")
+
+lrow = sh1.Range("a" & Rows.Count).End(xlUp).Row
+sh1.Range("1:1").Insert
+sh1.Range("2:2").Find(what:="Allocation").Offset(-1, 0).Select
+'Range(Cells(1, ActiveCell.Offset(0, 1)), Cells(1, 2)).Select
+Do While ActiveCell.Offset(1, 0) <> ""
+For wd = 1 To 5
+wwk = sh5.Cells(13, 2 + wd).Value
+sh1.Range(ActiveCell.Offset(0, 0), ActiveCell.Offset(0, 3)).Select
+
+With Selection
+    .HorizontalAlignment = xlCenter
+    .VerticalAlignment = xlBottom
+    .Merge
+    .Value = wwk
+    .Font.Bold = True
+End With
+
+With Selection.Borders(xlEdgeLeft)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+End With
+
+With Selection.Borders(xlEdgeTop)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+End With
+
+With Selection.Borders(xlEdgeBottom)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+End With
+
+With Selection.Borders(xlEdgeRight)
+    .LineStyle = xlContinuous
+    .ColorIndex = 0
+    .TintAndShade = 0
+    .Weight = xlMedium
+End With
+
+
+ActiveCell.Offset(0, 1).Select
+Next
+Loop
+
+'   Delete the formatting
+
+fc = sh1.Range("1:1").Find(what:="Friday").Offset(0, 1).Column
+sh1.Range(Cells(1, fc), Cells(1, fc + 10)).Select
+Selection.EntireColumn.Delete
+sh1.Range("A1").Select
+sh1.UsedRange.EntireColumn.AutoFit
+
+
+'   Update the Employees BAU hours in summary sheets
+
+sh6.Activate
+dlastrw = sh6.Range("A" & Rows.Count).End(xlUp).Row
+sh6.Range("A:A").EntireColumn.Insert
+sh6.Range("A2:A" & dlastrw).FormulaR1C1 = "=RC[2]&RC[3]"
+
+sh5.Activate
+lastrw = sh5.Range("A15", Range("A15")).End(xlDown).Row
+sh5.Range("H15:H" & lastrw).FormulaR1C1 = _
+"=IFERROR(VLOOKUP(R13C&RC2,Data_Sheet!C1:C9,9,0),0)"
+
+sh5.Range("K15:K" & lastrw).FormulaR1C1 = _
+"=IFERROR(VLOOKUP(R13C&RC2,Data_Sheet!C1:C9,9,0),0)"
+
+sh5.Range("N15:N" & lastrw).FormulaR1C1 = _
+"=IFERROR(VLOOKUP(R13C&RC2,Data_Sheet!C1:C9,9,0),0)"
+
+sh5.Range("Q15:Q" & lastrw).FormulaR1C1 = _
+"=IFERROR(VLOOKUP(R13C&RC2,Data_Sheet!C1:C9,9,0),0)"
+
+sh5.Range("T15:T" & lastrw).FormulaR1C1 = _
+"=IFERROR(VLOOKUP(R13C&RC2,Data_Sheet!C1:C9,9,0),0)"
+
+
+End Sub
+
+
+Sub ReformatData()
+Dim rCheck As Range, Rng As Range, rCopyLocn As Range
+Dim lastrw As Long, j As Long
+lastrw = Range("a1048576").End(xlUp).Row
+With Sheets("Sheet2")
+'Set Data Range
+Set rCheck = .UsedRange.Offset(1, 1).Resize(.UsedRange.Rows.Count - 1, .UsedRange.Columns.Count - 1)
+'Set Receive Range
+Set rCopyLocn = Sheets("Sheet3").Range("C1")
+'check data for blanks and copy
+For j = 1 To lastrw
+For Each Rng In rCheck
+If Rng <> "" Then
+    rCopyLocn.Value = Rng.Value
+    rCopyLocn.Offset(0, -2).Value = .Cells(Rng.Row, 1).Value
+    rCopyLocn.Offset(0, -1).Value = .Cells(1, Rng.Column).Value
+    Set rCopyLocn = rCopyLocn.Offset(1, 0)
+End If
+Next
+
+Cells(rCopyLocn, j).Offset(0, 1).Select
+Next
+
+
+End With
+End Sub
+
+Sub Savefiles()
+Dim fso As Object
+Dim folderpath As Variant
+Dim wrk As Workbook, cc As Variant
+Dim filepath As String
+Dim sh1 As Worksheet, sh2 As Worksheet
+Dim fr As Integer, lrow As Long
+Dim lastrw As Long
+Dim FndValue As String
+Dim Rng As Range, fd As Integer
+Dim FndRng As Range
+Dim FirstCell As String
+
+'   Save the allocation files and summary sheets
+
+cc = Format(Date, "dd-mm-yyyy")
+Set fso = New FileSystemObject
+folderpath = ThisWorkbook.Path & "\" & "Allocation"
+If Not fso.FolderExists(folderpath) = True Then
+fso.CreateFolder (folderpath)
+End If
+'filepath = folderpath & "\" & "WorkAllocation - " & Date & ".xlsx"
+ThisWorkbook.Sheets(Array("Summary", "Work Allocation")).Copy
+Set wrk = ActiveWorkbook
+'wrk.Sheets("Allocation Summary").Visible = True
+wrk.Sheets("Summary").Select
+fr = Range("A:A").Find(what:="Team").Row - 3
+Range("A1:A" & fr).EntireRow.Delete
+lastrw = Range("A" & Rows.Count).End(xlUp).Row
+Range("A1:A" & lastrw).EntireRow.Copy
+Range("A1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+wrk.Sheets("Work Allocation").Select
+
+'   Unprotect the respective columns
+lrow = Range("A" & Rows.Count).End(xlUp).Row
+FndValue = "Completed Status"
+Set Rng = Range("2:2")
+Set FndRng = Rng.Find(what:=FndValue)
+FirstCell = FndRng.Address
+
+Do
+'  MsgBox FndRng.Address
+fd = FndRng.Find(what:=FndValue).Column
+Range(Cells(3, fd), Cells(lrow, fd + 1)).Select
+' Range(Selection, Selection.End(xlDown)).Select
+Selection.Locked = False
+Selection.FormulaHidden = False
+Range(Cells(3, fd), Cells(lrow, fd)).Select
+With Selection.Validation
+.Delete
+.add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:= _
+xlBetween, Formula1:="Completed, InProcess"
+.IgnoreBlank = True
+.InCellDropdown = True
+.InputTitle = ""
+.ErrorTitle = ""
+.InputMessage = ""
+.ErrorMessage = ""
+.ShowInput = True
+.ShowError = True
+End With
+
+Set FndRng = Rng.FindNext(FndRng)
+Loop While FirstCell <> FndRng.Address
+Range("A1").Select
+
+ActiveSheet.Protect Password:="EQMacros"
+wrk.SaveAs folderpath & "\Workallocation " & cc & ".xlsx"
+wrk.Close savechanges:=True
+MsgBox "Files has been successful saved in respecitve folder.", vbInformation
+End Sub
+
+Sub Clearcells()
+Dim sh1 As Worksheet
+Dim sh2 As Worksheet, fndtxt As Object
+Dim sh3 As Worksheet, sh4 As Worksheet
+Dim sklrow As Long, ad As Variant
+
+'   Clear the cells content and formatting
+
+Set sh1 = ThisWorkbook.Sheets("Work Allocation")
+Set sh2 = ThisWorkbook.Sheets("Skills Matrix")
+Set sh3 = ThisWorkbook.Sheets("Process Type")
+Set sh4 = ThisWorkbook.Sheets("Tasks")
+
+sh1.AutoFilterMode = False
+sh2.AutoFilterMode = False
+sh3.AutoFilterMode = False
+sh4.AutoFilterMode = False
+
+sh3.Range("Ak:AK").Clear
+sklrow = sh2.Range("a1048576").End(xlUp).Row
+sh1.Activate
+Set fndtxt = sh1.Range("1:1").Find(what:="Process Type")
+
+If Not fndtxt Is Nothing Then
+ad = sh1.Range("1:1").Find(what:="Process Type").Address
+sh1.Range(ad).Resize(1, sklrow).EntireColumn.Select
+Selection.EntireColumn.Delete
+End If
+If sh1.Range("a1").Value = "" Then
+sh1.Range("1:1").Delete
+sh1.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+Else
+sh1.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+End If
+sh3.Activate
+sh3.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+
+End Sub
+
+
+Sub findtest()
+Dim sh2 As Worksheet, sh3 As Worksheet
+Dim lrow As Long, rg As Range
+Dim empname As String
+Dim i As Integer, fdtxt As Object
+Set sh2 = ThisWorkbook.Sheets("Data_sheet")
+Set sh3 = ThisWorkbook.Sheets("Skills Matrix")
+lrow = sh3.Range("a" & Rows.Count).End(xlUp).Row
+sh2.Activate
+'lastrw = sh2.Range("J14", Range("j14").End(xlDown)).Count
+Set rg = sh2.Range("AJ1:AJ" & lrow)
+
+For i = 1 To lrow + 2
+
+empname = sh2.Range("ah" & i + 3).Value
+
+With rg
+Set fdtxt = .Find(what:=empname, LookAt:=xlWhole, MatchCase:=True)
+End With
+
+If Not fdtxt Is Nothing Then
+MsgBox "Find the Employee's Name " & empname
+Else
+MsgBox "not match"
+End If
+
+Next
+End Sub
+
+
+Sub procestype_create()
+Dim sh2 As Worksheet
+Dim sh4 As Worksheet, sh3 As Worksheet
+Dim fd As Integer, pp As Long
+Dim procedureno
+Dim pn As Integer
+Set sh2 = ThisWorkbook.Sheets("Skills Matrix")
+Set sh3 = ThisWorkbook.Sheets("Tasks")
+Set sh4 = ThisWorkbook.Sheets("Process Type")
+sh4.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+sh3.Activate
+
+sh3.Range("B1:E1" & Range("B1048576").End(xlUp).Row).Copy
+sh4.Activate
+sh4.Range("A1").PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
+:=False, Transpose:=False
+sh4.Range("A1").PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, SkipBlanks _
+:=False, Transpose:=False
+fd = sh4.Range("1:1").Find(what:="Procedure Number").Offset(0, 1).Column
+Cells(1, fd).Value = "Procedure No Check"
+Dim lrw As Long
+lrw = sh4.Range("A" & Rows.Count).End(xlUp).Row
+For pp = lrw To 2 Step -1
+procedureno = Cells(pp, fd - 1).Value
+pn = InStr(1, Cells(pp, fd - 1).Value, "&")
+If procedureno = "N/A" Or procedureno = "" Then
+Cells(pp, fd).Value = 0
+ElseIf pn = 0 Then
+Cells(pp, fd).Value = procedureno
+Else
+Cells(pp, fd).Value = Left(procedureno, pn - 2)
+Cells(pp + 1, fd).EntireRow.Insert Shift:=xlUp
+Cells(pp + 1, fd).EntireRow.FillDown
+Cells(pp, fd).Value = Right(procedureno, pn - 2)
+End If
+Next
+
+'Selection.Sort key1:=Range("A1"), order1:=xlAscending, key2:=Range("D1"), order2:=xlAscending, Header:=xlYes
+Application.CutCopyMode = False
+sh2.Activate
+sh2.Range("B1", Range("B1").End(xlToRight)).Copy
+sh4.Range("F2").PasteSpecial Paste:=xlPasteValues, Transpose:=True
+lrw = sh4.Range("A" & Rows.Count).End(xlUp).Row
+sh4.Range("G2:G" & lrw).FormulaR1C1 = "=IFERROR(IFERROR(LEFT(RC[-1],FIND(""."",RC[-1])-1),LEFT(RC[-1],FIND("" "",RC[-1]))),"""")"
+sh4.Range("H2:H" & lrw).FormulaR1C1 = "=IFERROR(INDEX(C6,MATCH(RC5,C7,0),1),0)"
+sh4.UsedRange.Copy
+sh4.Range("A1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+sh4.Range("H1").Value = "Skills Matrix"
+sh4.Range("F:G").Delete
+sh4.UsedRange.EntireColumn.AutoFit
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Option Explicit
+
+
+Sub Split_days()
+Dim lastrw As Long
+Dim sh5 As Worksheet, i As Long
+Dim dd As Integer, wk3 As Date
+Dim wk1 As Date, ddd As Date
+Dim sh7 As Worksheet, sh8 As Worksheet
+Dim ad
+Dim dm As Long, lastrow As Long
+Dim Mw3 As Integer, Mw1 As Integer
+Dim Lw As Integer, Md2 As Date
+Dim Ml As Date, Mdm As Date, Md5 As Date
+Dim j As Integer, dvalue As String
+Dim fff As String, fp As String, fg As String
+Dim Rng As Range, dmon As Date
+Dim fd, Mon As Date, Md8 As Date
+Dim Mw2 As Integer, wkk
+Dim Md1 As Date, Mdd As Date
+
+Set sh5 = ThisWorkbook.Sheets("Summary")
+Set sh7 = ThisWorkbook.Sheets("Date_split")
+Set sh8 = ThisWorkbook.Sheets("Tasks")
+sh7.UsedRange.Clear
+
+sh8.Activate
+sh8.Range("B1:J1" & Range("B1048576").End(xlUp).Row).Copy
+sh7.Range("A1").PasteSpecial Paste:=xlPasteValues
+sh7.Range("A1").PasteSpecial Paste:=xlPasteFormats
+sh7.UsedRange.EntireColumn.AutoFit
+sh7.Activate
+lastrw = sh7.Range("A" & Rows.Count).End(xlUp).Row
+sh7.Range("1:1").Find(what:="Category").Offset(0, 1).Select
+ActiveCell.Value = "Date check"
+i = 2
+fd = sh7.Range("1:1").Find(what:="Date check").Column
+
+''' SLA time change to date formating
+For dd = lastrw To 2 Step -1
+
+ If sh7.Cells(dd, fd - 1).Value = "Skill Matrix" Then
+    'Daily activity loop checking
+    If sh7.Cells(dd, 3) = "Daily" Then
+        sh7.Cells(dd, fd).Value = "Yes"
+        
+    '''Quarter activity loop checking
+    ElseIf sh7.Cells(dd, 3).Value = "Quarterly" Then
+'        MsgBox StrConv(Cells(dd, 6), vbProperCase)
+        Select Case StrConv(sh7.Cells(dd, 6), vbProperCase)
+            Case Is = "3rd Week Of Month"
+            'wk3 = "=TODAY()-DAY(TODAY())+1+3*7-WEEKDAY(TODAY()-DAY(TODAY())+8-2)"
+'            wk3 = Date - Day(Date) + 1 + 3 * 7 - Weekday(Date - Day(Date) + 8 - 2)
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            wk3 = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If wk3 = 3 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+                                              
+            Case Is = "15th Day Of Month"
+            'ddd = "=TODAY()-DAY(TODAY())+1+3*7-WEEKDAY(TODAY()-DAY(TODAY())+8-2)"
+            ddd = Date - Day(Date - 1) + 14
+            
+            If ddd = Date + (7 - Weekday(Date, vbMonday) + 1) Or ddd = Date + (7 - Weekday(Date, vbMonday) + 2) Or ddd = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            ddd = Date + (7 - Weekday(Date, vbMonday) + 4) Or ddd = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+'            Cells(dd, fd).Value = Format(Date - Day(Date) + 1 + 3 * 7 - Weekday(Date - Day(Date) + 8 - 2), "DDDD")
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 14, "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+    
+    '''Monthly activity loop checking
+    ElseIf sh7.Cells(dd, 3).Value = "Monthly" Then
+    
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+'            MsgBox StrConv(Cells(dd, 6).Value, vbProperCase)
+            Case Is = "1st Day Of Month"
+            Md1 = Date - Day(Date - 1)
+            
+            If Md1 = Date + (7 - Weekday(Date, vbMonday) + 1) Or Md1 = Date + (7 - Weekday(Date, vbMonday) + 2) Or Md1 = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Md1 = Date + (7 - Weekday(Date, vbMonday) + 4) Or Md1 = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1), "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+'            MsgBox StrConv(Cells(dd, 6).Value, vbProperCase)
+            Case Is = "08th Day Of Month"
+            Md8 = Date - Day(Date) + 8
+            
+            If Md8 = Date + (7 - Weekday(Date, vbMonday) + 1) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 2) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Md8 = Date + (7 - Weekday(Date, vbMonday) + 4) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1), "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "1st Week Of Month"
+'            'Mw1 = Date - Day(Date) + 1 + 3 * 7 - Weekday(Date - Day(Date) + 7 - 2)
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            Mw1 = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If Mw1 = 1 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "2nd Week Of Month"
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            Mw2 = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If Mw2 = 2 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "3rd Week Of Month"
+            'Mw3 = Date - Day(Date) + 1 + 3 * 7 - Weekday(Date - Day(Date) + 7 - 2)
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            Mw3 = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If Mw3 = 3 Then
+            'Cells(dd, fd).Value = Format(Date - Day(Date) + 1 + 3 * 7 - Weekday(Date - Day(Date) + 8 - 2), "DDDD")
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+            
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "Last Week Of Month"
+            'Lw = Date - Day(Date) + 1 + 5 * 7 - Weekday(Date - Day(Date) + 7 - 2)
+'            Lw = Application.WorksheetFunction.EoMonth(Date, 0) + 1 - Application.WorksheetFunction.Weekday(Application.WorksheetFunction.EoMonth(Date, 0) + 1 - 2)
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            Lw = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If Lw = 4 Or Lw = 5 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+        End Select
+        
+        Select Case StrConv(Cells(dd, 6).Value, vbProperCase)
+            Case Is = "10th Day Of Month"
+            Md8 = Date - Day(Date) + 10
+            
+            If Md8 = Date + (7 - Weekday(Date, vbMonday) + 1) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 2) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Md8 = Date + (7 - Weekday(Date, vbMonday) + 4) Or Md8 = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date) + 10, "DDDD")
+            Else
+'            Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 9, "DDDD")
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+            
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "2nd Day Of Month"
+            Md2 = Date - Day(Date) + 2
+            
+            If Md2 = Date + (7 - Weekday(Date, vbMonday) + 1) Or Md2 = Date + (7 - Weekday(Date, vbMonday) + 2) Or Md2 = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Md2 = Date + (7 - Weekday(Date, vbMonday) + 4) Or Md2 = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 1, "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+            
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "Last Day Of Month"
+            Ml = DateValue(Format(Application.WorksheetFunction.EoMonth(Date, 0), "D/MM/YYYY"))
+            'Ml = Year(Date) & "/" & Month(Date) + 1 & "/" & 0
+            
+            If Ml = Date + (7 - Weekday(Date, vbMonday) + 1) Or Ml = Date + (7 - Weekday(Date, vbMonday) + 2) Or Ml = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Ml = Date + (7 - Weekday(Date, vbMonday) + 4) Or Ml = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Application.WorksheetFunction.EoMonth(Date, 0), "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+            
+        End Select
+        
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "15th Day Of Month"
+            Mdm = Date - Day(Date - 1) + 14
+            
+            If Mdm = Date + (7 - Weekday(Date, vbMonday) + 1) Or Mdm = Date + (7 - Weekday(Date, vbMonday) + 2) Or Mdm = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Mdm = Date + (7 - Weekday(Date, vbMonday) + 4) Or Mdm = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 14, "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+            
+        End Select
+        
+        Select Case StrConv(sh7.Cells(dd, 6).Value, vbProperCase)
+            Case Is = "5th Day Of Month"
+            Md5 = Date - Day(Date - 1) + 4
+            
+            If Md5 = Date + (7 - Weekday(Date, vbMonday) + 1) Or Md5 = Date + (7 - Weekday(Date, vbMonday) + 2) Or Md5 = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Md5 = Date + (7 - Weekday(Date, vbMonday) + 4) Or Md5 = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+            sh7.Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 4, "DDDD")
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+            
+        End Select
+        
+    '''Week activity loop checking
+    ElseIf sh7.Cells(dd, 3).Value = "Weekly" Then
+        
+        Select Case StrConv(Cells(dd, 6).Value, vbProperCase)
+            Case Is = "Tuesday"
+            sh7.Cells(dd, fd).Value = "Tuesday"
+            Case Is = "Thursday"
+            sh7.Cells(dd, fd).Value = "Thursday"
+            Case Is = "Friday"
+            sh7.Cells(dd, fd).Value = "Friday"
+            Case Is = "Wednesday"
+            sh7.Cells(dd, fd).Value = "Wednesday"
+            Case Is = "Monday"
+            sh7.Cells(dd, fd).Value = "Monday"
+            
+            Case Is = "Tuesday & Thursday"
+            sh7.Cells(dd, fd).Value = "Thursday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Tuesday"
+            
+            Case Is = "Tuesday & Wednesday"
+            sh7.Cells(dd, fd).Value = "Wednesday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Tuesday"
+            
+            Case Is = "Thursday & Friday"
+            sh7.Cells(dd, fd).Value = "Friday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Thursday"
+            
+            Case Is = "Monday & Wednesday"
+            sh7.Cells(dd, fd).Value = "Wednesday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Monday"
+            
+            Case Is = "Tuesday, Wednesday & Thursday"
+            sh7.Cells(dd, fd).Value = "Thursday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Wednesday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Tuesday"
+            
+            Case Is = "Monday, Tuesday & Wednesday"
+            sh7.Cells(dd, fd).Value = "Wednesday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Tuesday"
+            sh7.Cells(dd + 1, fd).EntireRow.Insert Shift:=xlUp
+            sh7.Cells(dd + 1, fd).EntireRow.FillDown
+            sh7.Cells(dd, fd).Value = "Monday"
+            
+            End Select
+    
+    ElseIf sh7.Cells(dd, 3).Value = "Weeks 1 & 2" Then
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            wkk = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If wkk = 1 Or wkk = 2 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+    
+    ElseIf sh7.Cells(dd, 3).Value = "Weeks 3 & 4" Then
+            Dim wwk As Integer
+'            wwk = Int((13 + Day(Date) - Weekday(Date - 5)) / 7)
+            dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+            wwk = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+            
+            If wwk = 3 Or wwk = 4 Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+    
+    ElseIf sh7.Cells(dd, 3).Value = "Adhoc" Then
+            If sh7.Cells(dd, 6).Value = "Yes" Then
+            sh7.Cells(dd, fd).Value = "Yes"
+            Else
+            sh7.Cells(dd, fd).Value = "No"
+            End If
+    
+    Else
+ 
+    sh7.Cells(dd, fd).Value = "No"
+   End If
+ 
+ Else
+    
+    sh7.Cells(dd, fd).Value = sh7.Cells(dd, fd - 1).Value
+
+End If
+        
+Next dd
+
+'''Days wise process activity created
+    lastrow = sh7.Range("a" & Rows.Count).End(xlUp).Row
+ad = sh7.Range("1:1").Find(what:="Category").Offset(0, 2).Column
+
+
+For dm = 1 To 5
+
+    Cells(1, ad + dm - 1).Value = sh5.Cells(13, dm + 2).Value
+    
+    For j = 2 To lastrow
+        dvalue = Cells(1, ad + dm - 1).Value
+        fff = Cells(j, fd).Value
+        fp = Cells(j, fd - 7).Value
+        fg = Cells(j, fd - 2).Value
+        
+        
+        If sh7.Cells(j, fd - 1) = "Skill Matrix" Then
+        
+            If fg = "Tech Team" Or fg = "Control & Oversight" Or fg = "Management" Then
+                Cells(j, ad + dm - 1).Value = "No"
+                
+            ElseIf fff = "Yes" Then
+                Cells(j, ad + dm - 1).Value = "Yes"
+                
+            ElseIf fff = dvalue Then
+                Cells(j, ad + dm - 1).Value = "Yes"
+                
+            ElseIf dvalue = Cells(j + 1, fd).Value And fp = Cells(j + 1, fd - 8).Value Then
+                Cells(j, ad + dm - 1).Value = "Yes"
+                
+            ElseIf dvalue = Cells(j + 2, fd).Value And fp = Cells(j + 2, fd - 8).Value Then
+                Cells(j, ad + dm - 1).Value = "Yes"
+                
+            Else
+            
+                Cells(j, ad + dm - 1).Value = "No"
+            
+            End If
+        
+        Else
+            
+            sh7.Cells(j, ad + dm - 1).Value = sh7.Cells(j, fd).Value
+        
+        End If
+    Next j
+
+Next dm
+    
+
+
+
+End Sub
+
+
+
+
+Sub test()
+Dim dat As Date
+dat = Date - Day(Date) + 10
+d = DateSerial(Year(Date), Month(Date), 7)
+dd = Date + (7 - Weekday(Date, vbMonday) + 4)
+If dat = Date + (7 - Weekday(Date, vbMonday) + 1) Or dat = Date + (7 - Weekday(Date, vbMonday) + 2) Or dat = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+dat = Date + (7 - Weekday(Date, vbMonday) + 4) Or dat = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+
+'MsgBox Int((13 + Day(dat) - Weekday(dat - 5)) / 7)
+MsgBox dd
+End If
+End Sub
+
+
+Sub testt()
+d = DateSerial(Year(Date), Month(Date), 3)
+dddd = Date - Day(Date) + 10
+dmon = Date + (7 - Weekday(Date, vbMonday) + 1)
+Mw1 = Int((13 + Day(dmon) - Weekday(dmon - 5)) / 7)
+
+MsgBox Mw1
+End Sub
+
+Sub dateee()
+
+d = DateSerial(Year(Date), Month(Date), 7)
+Mdd = Date - Day(Date) + 10
+            
+            If Mdd = Date + (7 - Weekday(Date, vbMonday) + 1) Or Mdd = Date + (7 - Weekday(Date, vbMonday) + 2) Or Mdd = Date + (7 - Weekday(Date, vbMonday) + 3) Or _
+            Mdd = Date + (7 - Weekday(Date, vbMonday) + 4) Or Mdd = Date + (7 - Weekday(Date, vbMonday) + 5) Then
+'            Cells(dd, fd).Value = Format(Date - Day(Date - 1) + 9, "DDDD")
+            MsgBox Mdd & Format(Date - Day(Date) + 10, "DDDD")
+    End If
+
+End Sub
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,2219 @@
+Sub CRTProcess_Macro()
+Dim wb As Workbook
+Dim Fstfilepath As Variant
+Dim sh1, sh2 As Worksheet
+Dim sh4 As Worksheet
+Dim sh3 As Worksheet
+Dim wbb As Workbook
+Dim rng As Range
+Dim rnge As Range
+Dim shtname As String
+
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh2 = wb.Sheets("Rawdata")
+Set sh3 = wb.Sheets("CRTdata")
+Set sh4 = wb.Sheets("Process")
+
+w = 2
+'Clear payment sheets and rawdata sheets
+sh1.Activate
+sh1.AutoFilterMode = False
+Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).Clear
+sh2.AutoFilterMode = False
+sh2.Cells.Clear
+sh3.AutoFilterMode = False
+sh3.Cells.Clear
+sh4.Range("AI:AI").Clear
+
+Fstfilepath = Application.GetOpenFilename(FileFilter:="Excel Files (*.xlsx), .xlsx", Title:="Select the Payments Files", MultiSelect:=True)
+If Not IsArray(Fstfilepath) Then
+    MsgBox "Kindly select a file and Try Again!"
+Exit Sub
+Else
+
+End If
+For Each MyFile In Fstfilepath
+    sh2.Range("A1").CurrentRegion.Clear
+    Set clientwb = Workbooks.Open(MyFile)
+    wbname = clientwb.Name
+    
+    sh4.Range("AI" & w).Value = wbname
+    If clientwb.ReadOnly Then
+        Set objnet = CreateObject("WScript.NetWork")
+        'opnusername = Application.UserName  'Environ(Username)
+        opnusername = objnet.UserName
+        MsgBox "File is already opened by " & opnusername & ", So please close the workbook!"
+        'clientwb.Close savechanges:=False
+        Exit Sub
+    End If
+    shcount = clientwb.Sheets.Count
+
+    For i = 1 To shcount
+        sh2.Cells.Clear
+        shtname = clientwb.Sheets(i).Name
+        If shtname <> "IBANS & BIC SWIFT" And shtname <> "Closing Account" And shtname <> "Helper" And shtname <> "Total Funding" Then
+            'clientwb.Close savechanges:=False
+        
+            clientwb.Activate
+            clientwb.Sheets(i).Select
+        
+                            
+        'fd = clientwb.Sheets(i).Range("1:5").Find(what:="Raised By", LookIn:=xlValues, Lookat:=xlWhole)
+        'SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=False, SearchFormat:=False
+        Set rng = clientwb.Sheets(i).Range("2:3").Find(what:="Account From", LookIn:=xlValues, lookat:=xlWhole, SearchOrder:=xlByRows, _
+        MatchCase:=False, SearchFormat:=False)
+        clno = rng.Row
+        lrow = Cells(Rows.Count, 4).End(xlUp).Row
+        lcol = Cells(4, Columns.Count).End(xlToLeft).Column
+        col1 = Cells(3, Columns.Count).End(xlToLeft).Column
+        If lcol < col1 Then
+            lcol = Cells(3, Columns.Count).End(xlToLeft).Column
+        End If
+        Range(Cells(clno, lcol), Cells(lrow, 2)).Copy
+    '    MsgBox "Last Row: " & lRow & vbNewLine & _
+    '            "Last Column: " & lCol
+        ThisWorkbook.Activate
+        sh2.Activate
+        sh2.Range("A1").PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+        Application.CutCopyMode = False
+        lastrow = sh2.Range("B" & Rows.Count).End(xlUp).Row
+        If lastrow = 1 Then
+            MsgBox "Payments data not found in " & clientwb.Sheets(1).Name & " sheet!, Kindly check respective workbook.", vbInformation
+            'clientwb.Close savechanges:=False
+            Exit For
+        Else
+        ' Blanks columns add to heading
+            For x = 1 To lcol
+                If sh2.Cells(2, x).Value = "" Then
+                    sh2.Cells(2, x).Value = sh2.Cells(1, x).Value
+                End If
+            Next
+            sh2.Range("1:1").EntireRow.Delete
+            sh2.Range("A1").EntireColumn.Insert shift:=xlLeft
+            sh2.Range("A1").Value = "R.No"
+            sh2.Range("A2").Value = clno + 2
+            sh2.Range("A2:A" & lastrow - 1).DataSeries , xlDataSeriesLinear
+            lstcol = sh2.Cells(1, Columns.Count).End(xlToLeft).Column
+            sh2.Cells(1, lstcol + 1).Value = "SheetName"
+            shfnd = sh2.Range("1:1").Find(what:="SheetName").Column
+            sh2.Range(Cells(2, shfnd), Cells(lrow - clno, shfnd)).Value = shtname
+            sh2.Range("A1").Select
+            Call Cleanup_rawdata
+        End If
+        
+        End If
+    Next i
+
+'    For Each wbb In Workbooks
+'        If wbb.Name = wbname Then
+'            clientwb.Close savechanges:=False
+'        End If
+'    Next
+w = w + 1
+Next MyFile
+
+
+'Filter payment data & header changes
+sh3.AutoFilterMode = False
+sh3.Cells.Clear
+
+'Rawdata pasted in payment sheets
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+lrow = sh1.Cells(Rows.Count, 3).End(xlUp).Row
+
+' Find and Replace values
+ary = Array("N/A", "#N/A")
+For i = 0 To 1
+    sh1.Range("E:E", "J:J").Replace what:=ary(i), replacement:="", SearchOrder:=xlByColumns, MatchCase:=True
+Next i
+
+Set fdbank = sh1.Range("1:1").Find(what:="BankName", LookIn:=xlValues)
+On Error GoTo 0
+If fdbank Is Nothing Then
+    sh1.Cells(1, lcol + 1).Value = "BankName"
+    sh1.Cells(1, lcol + 1).Offset(0, 1).Value = "EL or EFSL"
+
+End If
+
+
+fndbn = sh1.Range("1:1").Find(what:="BankName").Offset(1, 0).Address
+fndEL = sh1.Range("1:1").Find(what:="EL or EFSL").Offset(1, 0).Address
+sp = Mid(fndbn, InStr(1, fndbn, "$") + 1, InStr(2, fndbn, "$") - InStr(1, fndbn, "$") - 1)
+spt = Mid(fndEL, InStr(1, fndEL, "$") + 1, InStr(2, fndEL, "$") - InStr(1, fndEL, "$") - 1)
+
+sh1.Range(fndbn & ":" & sp & lrow).FormulaR1C1 = "=IFERROR(IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",RC5=RC10,ISNUMBER(RC5),ISNUMBER(RC10),RC16=""GBP""),""Lloyds"",IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")<>""HSBC"",RC5<=4),""Lloyds to Others"",IF(VLOOKUP(RC6,Process!C32:C33,2,0)=IFERROR(VLOOKUP(RC11,Proces" & _
+        "s!C32:C33,2,0),""""),VLOOKUP(RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0)&"" to Others""))),""Sordcode Notmatch"")" & _
+        ""
+sh1.Range(fndEL & ":" & spt & lrow).FormulaR1C1 = "=IF(AND(IFNA(VLOOKUP(RC6,Process!C26,1,0),FALSE),IFNA(VLOOKUP(RC7,Process!C27,1,0),FALSE)),""Yes"",IF(COUNTIF(RC6:RC6,""Citi*""),""Yes"",""No""))"
+    
+sh1.Activate
+sh1.Range(Cells(2, lcol - 1), Cells(lrow, lcol)).Copy
+sh1.Range(fndbn).PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+Set rnge = sh1.Range("A1").CurrentRegion
+rnge.Copy
+sh3.Activate
+sh3.Range("A1").PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+Application.CutCopyMode = False
+
+
+' Column names rechanged
+For j = 1 To lcol
+dd = Cells(1, j).Value
+    If Cells(1, j).Value = "Lloyds CBO Instance" Then
+        intn = intn + 1
+        Cells(1, j).Value = "Instance" & intn
+    ElseIf Cells(1, j).Value = "Sort Code" Then
+        sc = sc + 1
+        Cells(1, j).Value = "Sort Code" & sc
+    ElseIf Cells(1, j).Value = "Account Number" Then
+        an = an + 1
+        Cells(1, j).Value = "Account Number" & an
+    ElseIf Cells(1, j).Value = "IBAN Number" Then
+        bn = bn + 1
+        Cells(1, j).Value = "IBAN Number" & bn
+    ElseIf Cells(1, j).Value = "Account Name" Then
+        cn = cn + 1
+        Cells(1, j).Value = "Account Name" & cn
+    ElseIf Cells(1, j).Value = "Reference" Then
+        Cells(1, j).Value = "Ref No"
+    ElseIf Cells(1, j).Value = "Date" Then
+        Cells(1, j).Value = "Date BOP Raised"
+    ElseIf Cells(1, j).Value = "Amount" Then
+        Cells(1, j).Value = "Value"
+    ElseIf j = lcol Then
+        Cells(1, j + 1).Value = "Client Names"
+        
+    End If
+
+Next
+
+'Exsiting table unlist format & Create new table format
+For Each obj In sh3.ListObjects
+    obj.Unlist
+Next
+sh3.ListObjects.Add(xlSrcRange, Range([A1].End(xlDown), [A1].End(xlToRight)), , xlYes).Name = "CRTable"
+Set tblCRT = sh3.ListObjects("CRTable")
+
+With tblCRT
+    .TableStyle = ""
+End With
+
+'Reference base source files data filter
+Call RunAdvancedFiltersEngine
+
+'Client source file reupdated
+Call Return_Source
+
+wb.Sheets("Home").Select
+MsgBox "Process has been done and Output Investment file saved!", vbInformation
+
+Application.DisplayAlerts = True
+Application.ScreenUpdating = True
+
+End Sub
+
+Sub Cleanup_rawdata()
+Dim wb As Workbook
+Dim sh1, sh2 As Worksheet
+Dim colm1 As String
+Dim cel As Range
+
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh2 = wb.Sheets("Rawdata")
+
+
+' Find and remove the rows
+sh2.Range("A1").Select
+Set fnd = sh2.Range("A:F").Find(what:="*ARCHIVED ENTRIES ABOVE THIS LINE*", LookIn:=xlValues, lookat:=xlWhole)
+On Error GoTo 0
+
+If Not fnd Is Nothing Then
+    fnd.Activate
+    rw = fnd.Row
+    Range(Cells(2, 1), Cells(rw, 1)).Select
+    Selection.EntireRow.Delete
+End If
+' Find and remove the rows
+Set fnd1 = sh2.Range("A:F").Find(what:="*ENTRIES PROCESSED AND AWAITING RECONCILIATION ABOVE THIS LINE*", LookIn:=xlValues, lookat:=xlWhole)
+On Error GoTo 0
+
+If Not fnd1 Is Nothing Then
+    fnd1.Activate
+    rw = fnd1.Row
+    Range(Cells(2, 1), Cells(rw, 1)).Select
+    Selection.EntireRow.Delete
+ElseIf fnd1 Is Nothing Then
+    sh2.Cells.Clear
+    Exit Sub
+End If
+
+'Without data exit functions
+If fnd Is Nothing And fnd1 Is Nothing Then
+    Exit Sub
+End If
+' Payment sheet is find the number of columns count
+sh1.Activate
+lscol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+'lstrw = sh1.Range("A" & Columns.Row).End(xlUp).Row
+
+sh2.Activate
+lrow = sh2.Range("E" & Rows.Count).End(xlUp).Row
+If lrow = 1 Then
+    Exit Sub
+End If
+Set myRange = sh2.Range("1:1")
+
+
+' Find and Replace with match columns
+Set fndport = myRange.Find(what:="Portfolio", LookIn:=xlValues, lookat:=xlWhole)
+portcol = fndport.Column
+If portcol < 3 Then
+    Set fndpay = myRange.Find(what:="Payment Description", LookIn:=xlValues, lookat:=xlWhole)
+    fndcol = fndpay.Column
+    sh2.Cells(1, fndcol + 1).EntireColumn.Insert shift:=xlRight
+    sh2.Range(Cells(portcol - 1, portcol), Cells(lrow, portcol)).Copy
+    sh2.Cells(1, fndcol + 1).PasteSpecial Paste:=xlPasteValues
+    Application.CutCopyMode = False
+    sh2.Cells(1, portcol).EntireColumn.Delete
+End If
+
+'' Find IBan Number & filter the values
+'Set fndIban1 = sh2.Range("1:1").Find(what:="IBAN Number*", LookIn:=xlValues, SearchDirection:=xlNext)
+'On Error GoTo 0
+'Set FndIban2 = sh2.Range("1:1").Find(what:="IBAN Number*", LookIn:=xlValues, SearchDirection:=xlPrevious)
+'On Error GoTo 0
+'Set Fndswift1 = sh2.Range("1:1").Find(what:="BIC/Swift Code*", LookIn:=xlValues, SearchDirection:=xlPrevious)
+'On Error GoTo 0
+'
+'If Not fndIban1 Is Nothing Then
+'    fdIban1 = fndIban1.Column
+'    fdIban2 = FndIban2.Column
+'    fdswift = Fndswift1.Column
+'    fndcd = myRange.Find(what:="Credit", LookIn:=xlValues, Lookat:=xlWhole).Column
+'    Iban = "IBAN Account From"
+'    Iban1 = "IBAN Account To"
+'
+'    aa = sh2.Cells(1, fndcd + 1).Value
+'    If sh2.Cells(1, fndcd + 1).Value = Iban Then
+'        Call IBanCode
+'    Else
+'        sh2.Cells(1, fndcd + 1).EntireColumn.Insert shift:=xlRight
+'        sh2.Cells(1, fndcd + 1).EntireColumn.Insert shift:=xlRight
+'        sh2.Cells(1, fndcd + 1).Value = Iban
+'        sh2.Cells(1, fndcd + 2).Value = Iban1
+'        sh2.Range(Cells(2, fdIban1), Cells(lrow, fdIban1)).Copy
+'        sh2.Cells(2, fndcd + 1).PasteSpecial Paste:=xlPasteValues
+'        sh2.Range(Cells(2, fdIban2), Cells(lrow, fdIban2)).Copy
+'        sh2.Cells(2, fndcd + 2).PasteSpecial Paste:=xlPasteValues
+'        Application.CutCopyMode = False
+'    End If
+'End If
+
+
+' Find and Replace praghara symbol
+
+    For Each cel In myRange
+        If cel = "" Then Exit For
+        cel = Replace(cel, Chr(10), " ")
+    Next
+
+' Rawdata sheet header name change to payment sheet format
+
+For cl = 1 To lscol
+    colm1 = sh2.Cells(1, cl).Value
+    colm2 = sh1.Cells(1, cl).Value
+    
+    
+    
+    If colm1 = "IBAN Number MUST BE COMPLETED" Then
+        myRange.Replace what:=colm1, replacement:="IBAN Number", SearchFormat:=True
+    'MsgBox colm1 & colm2
+    ElseIf colm1 = "" Then
+        sh2.Cells(1, cl) = sh1.Cells(1, cl)
+        
+           
+    'Iban number find and pasted seperate columns
+    ElseIf sh2.Cells(1, cl) <> sh1.Cells(1, cl) Then
+                
+        On Error Resume Next
+        fdcl = sh1.Cells(1, cl).Find(what:=colm2).Column
+        On Error GoTo 0
+        Set fndnw = sh1.Range("1:1").Find(what:=colm1 & "*", LookIn:=xlValues, lookat:=xlWhole)
+        fdpy = fndnw.Column
+        ' if headers not match will delete rows in Rawdata
+        If fndnw Is Nothing Then
+            sh2.Cells(1, cl).EntireColumn.Delete shift:=xlToLeft
+            cl = cl - 1
+                    
+        ' Find heading & Iban number insert seperate
+        ElseIf colm2 = "IBAN Account From" Then
+            
+            fdIban1 = myRange.Find(what:="IBAN Number*", LookIn:=xlValues, SearchDirection:=xlNext).Column
+            On Error GoTo 0
+            Set payfnd = sh1.Range("1:1").Find(what:=colm2, LookIn:=xlValues, lookat:=xlWhole)
+            pyfnd = payfnd.Column
+            'sh2.Cells(1, cl) = sh1.Cells(1, cl)
+            sh2.Cells(1, cl).Select
+            sh2.Cells(1, cl).EntireColumn.Insert
+            sh2.Cells(1, cl) = sh1.Cells(1, cl)
+'            sh1.Cells(1, pyfnd).Copy
+'            sh2.Cells(1, pyfnd).PasteSpecial Paste:=xlPasteValues
+            sh2.Range(Cells(2, fdIban1), Cells(lrow, fdIban1)).Copy
+            'sh2.Range(Cells(2, cl), Cells(lrow, cl)).Copy
+            sh2.Cells(2, pyfnd).Select
+            sh2.Cells(2, pyfnd).PasteSpecial Paste:=xlPasteValues
+            'sh2.Cells(1, cl).EntireColumn.Insert shift:=xlToLeft
+            'sh2.Cells(1, cl).EntireColumn.Delete
+            'cl = cl - 1
+            
+        ElseIf colm2 = "IBAN Account To" Then
+            
+            fdIban2 = myRange.Find(what:="IBAN Number*", LookIn:=xlValues, SearchDirection:=xlPrevious).Column
+            Set payfnd = sh1.Range("1:1").Find(what:=colm2, LookIn:=xlValues, lookat:=xlWhole)
+            pyfnd = payfnd.Column
+            sh2.Cells(1, cl).Select
+            sh2.Cells(1, cl).EntireColumn.Insert
+            sh2.Cells(1, cl) = sh1.Cells(1, cl)
+            sh2.Range(Cells(2, fdIban2), Cells(lrow, fdIban2)).Copy
+            sh2.Cells(2, pyfnd).Select
+            sh2.Cells(2, pyfnd).PasteSpecial Paste:=xlPasteValues
+           
+        ElseIf colm1 = "IBAN" And colm2 = "IBAN Number" Then
+            sh2.Cells(1, cl) = sh1.Cells(1, cl)
+        
+        
+        ElseIf cl <> fdpy And sh1.Cells(1, fdpy).Value = "BIC/Swift Code Account To" Then
+            fdswift = myRange.Find(what:="SheetName", LookIn:=xlValues, SearchDirection:=xlNext).Column
+            sh2.Cells(1, fdswift).Select
+            sh2.Cells(1, fdswift).EntireColumn.Insert
+            sh2.Cells(1, fdswift) = sh1.Cells(1, fdpy)
+            sh2.Range(Cells(2, cl), Cells(lrow, cl)).Copy
+            sh2.Cells(2, fdswift).Select
+            sh2.Cells(2, fdswift).PasteSpecial Paste:=xlPasteValues
+            sh2.Cells(1, cl).EntireColumn.Delete
+        
+        Else
+            sh2.Cells(1, cl).EntireColumn.Insert shift:=xlToLeft
+            sh2.Cells(1, cl) = sh1.Cells(1, cl)
+            cl = cl - 1
+            
+        End If
+    End If
+Next
+
+' Sheet name find & paste Currency format
+curng = sh2.Range("1:1").Find(what:="SheetName", LookIn:=xlValues).Offset(1, 0).Address
+shtname = sh2.Range(curng).Value
+curcol = sh2.Range("1:1").Find(what:="Currency", LookIn:=xlValues).Offset(1, 0).Column
+
+' sheets wise currency pasted
+If shtname = "ORT" Or shtname = "ODP" Or shtname = "SRT" Or shtname = "SDP" Or shtname = "Barclays" Or shtname = "NCM Suspense" Then
+    sh2.Range(Cells(2, curcol), Cells(lrow, curcol)).Value = "GBP"
+ElseIf shtname = "EUR IMM" Or shtname = "EUR NCM Suspense" Then
+    sh2.Range(Cells(2, curcol), Cells(lrow, curcol)).Value = "EUR"
+ElseIf shtname = "USD IMM" Then
+    sh2.Range(Cells(2, curcol), Cells(lrow, curcol)).Value = "USD"
+End If
+
+
+'lastrw = sh2.Cells(Rows.Count, fndIban1).End(xlUp).Row
+'
+'If lastrw = 1 Then
+'
+'    MsgBox "There are no ESSDR data", vbInformation
+'    Else
+'    With sh2.Range("1:1")
+'    .AutoFilter Field:=fndIban1, Criteria1:="<>", Operator:=xlFilterValues
+'    .Range(Cells(lastrw, 1), Cells(1, Columns.Count).End(xlToLeft)).SpecialCells(xlCellTypeVisible).Copy
+'    sh2.Range("a1").PasteSpecial
+'    sh2.AutoFilterMode = False
+'    sh2.Application.CutCopyMode = False
+'    End With
+'End If
+
+
+sh2.Range(Cells(2, lscol), Cells(lrow, 1)).Copy
+sh1.Activate
+sh1.Range("A1048576").End(xlUp).Offset(1, 0).Select
+Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+Application.CutCopyMode = False
+
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+End Sub
+
+Sub IBanCode()
+Dim wb As Workbook
+Dim sh2 As Worksheet
+Dim r, rw As Range
+
+Set wb = ThisWorkbook
+Set sh2 = wb.Sheets("Rawdata")
+
+FndIban1 = sh2.Range("1:1").Find(what:="IBAN Number", LookIn:=xlValues, SearchDirection:=xlNext).Column
+FndIban2 = sh2.Range("1:1").Find(what:="IBAN Number", LookIn:=xlValues, SearchDirection:=xlPrevious).Column
+
+lastrw = sh2.Cells(Rows.Count, FndIban1).End(xlUp).Row
+
+If lastrw > 1 Then
+    
+    With sh2.Range("1:1")
+    .AutoFilter Field:=FndIban1, Criteria1:="<>", Operator:=xlFilterValues
+    '.Range(Cells(lastrw, fndIban1), Cells(1, Columns.Count).End(xlToLeft)).SpecialCells(xlCellTypeVisible).Copy
+    '.Range(Cells(lastrw, fndIban1), Cells(1, fndIban1)).SpecialCells(xlCellTypeVisible).Select
+    Set r = Range("H2", Range("H" & Rows.Count).End(xlUp))
+    ' Check if r is only 1 cell
+        Set r = r.SpecialCells(xlCellTypeVisible)
+        fndfrm = sh2.Range("1:1").Find(what:="IBAN Account From", LookIn:=xlValues, SearchDirection:=xlPrevious).Column
+        For Each rc In r
+            rc.Select
+            Cells(rc.Row, fndfrm).Value = rc
+        j = j + 1
+        Next rc
+    Set rw = Range("M2", Range("M" & Rows.Count).End(xlUp))
+    ' Check if r is only 1 cell
+        Set rw = rw.SpecialCells(xlCellTypeVisible)
+        fndfrm = sh2.Range("1:1").Find(what:="IBAN Account From", LookIn:=xlValues, SearchDirection:=xlPrevious).Column
+        For Each rc In r
+            rc.Select
+            Cells(rc.Row, fndfrm).Value = rc
+        j = j + 1
+        Next rc
+        'Range(r(1), rc).SpecialCells(xlCellTypeVisible).Copy
+    
+    End With
+
+    sh2.Range("a1").Select
+    sh2.AutoFilterMode = False
+    sh2.Application.CutCopyMode = False
+    
+
+End If
+
+End Sub
+
+
+Sub testfff()
+Set rw = Range("M2", Range("M" & Rows.Count).End(xlUp))
+' Check if r is only 1 cell
+If rw.Count = 1 Then
+    rw.Copy
+Else ' Your previous code
+    Set rw = rw.SpecialCells(xlCellTypeVisible)
+    For Each rc In rw
+        j = j + 1
+        rc.Select
+        Cells(rc.Row, 22).Value = rc
+        'If j = 10 Or j = r.Count Then Exit For
+    Next rc
+    Range(r(1), j).SpecialCells(xlCellTypeVisible).Copy
+End If
+End Sub
+
+
+
+
+
+Option Explicit
+
+'Sub RunAdvancedFiltersEngine(wsOutput As Worksheet, )
+Sub RunAdvancedFiltersEngine()
+
+Dim tblOutput As ListObject
+Dim aRng As Range, l As Long, i As Integer
+Dim strFieldName As String, strOperator1 As String, strCriteria1 As String, strxlAndOr As String, strOperator2 As String, strCriteria2 As String, _
+    strOutputFieldName As String, strOutputValue As String, ifOutputifOverWrite As Boolean
+Dim lngIndex As Long, strAutoFilterCriteria1 As String, strAutoFilterCriteria2 As String, lngxlAndOr As Long, lngOutputField_Index As Long
+
+Dim tblAdvancedFilters As ListObject
+Dim wsAdvancedFilters As Worksheet
+
+Set wsAdvancedFilters = ThisWorkbook.Sheets("AdvancedFilters")
+
+Set tblAdvancedFilters = wsAdvancedFilters.ListObjects("tblAdvancedMasters")
+
+Set tblOutput = ThisWorkbook.Sheets("CRTdata").ListObjects("CRTable")
+
+If tblAdvancedFilters.ListRows.Count = 0 Then Exit Sub
+
+'With wsAdvancedFilters
+'    .Copy After:=wbOutput.Worksheets(wbOutput.Worksheets.Count)
+'End With
+'With ActiveSheet
+'    .Rows("1:4").Delete Shift:=xlUp
+'    For i = 1 To .Shapes.Count
+'        .Shapes(1).Delete
+'    Next i
+'    .Cells.Validation.Delete
+'    .Cells.Locked = True
+'    .Protect Password:=wsPassword, DrawingObjects:=True, Contents:=True, Scenarios:=True, AllowSorting:=True, AllowFiltering:=True
+'    .Range("A3").Select
+'End With
+
+For Each aRng In tblAdvancedFilters.ListColumns("AdvFilterName").DataBodyRange
+
+    If GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "ifEnabled") = True Then
+        
+        strOutputFieldName = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Output.FieldName")
+        strOutputValue = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Output.Value")
+        ifOutputifOverWrite = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Output.ifOverWrite")
+        'lngOutputField_Index = tblOutput.ListColumns(strOutputFieldName).Index
+        
+        For l = 1 To 8
+            ' Set Input Variables
+            strFieldName = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".FieldName")
+            strOperator1 = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".Operator1")
+            strCriteria1 = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".Criteria1")
+'            strxlAndOr = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".xlAndOr")
+'            strOperator2 = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".Operator2")
+'            strCriteria2 = GetCellInATable(wsAdvancedFilters, tblAdvancedFilters, aRng.Row, "Filter" & l & ".Criteria2")
+            
+            ' Process Variables
+            If strFieldName = "" Then GoTo SkipFilterOnField:
+            lngIndex = tblOutput.ListColumns(strFieldName).Index
+            strAutoFilterCriteria1 = GetAutoFilterCriteria(strOperator1, strCriteria1)
+            'strAutoFilterCriteria2 = GetAutoFilterCriteria(strOperator2, strCriteria2)
+            
+'            Select Case LCase(strxlAndOr)
+'                Case Is = "and"
+'                    lngxlAndOr = 1
+'                Case Is = "or"
+'                    lngxlAndOr = 2
+'            End Select
+            
+            ' Apply Filter
+'            If strAutoFilterCriteria2 <> "" Then
+'                tblOutput.Range.AutoFilter Field:=lngIndex, _
+'                    Criteria1:=strAutoFilterCriteria1, Operator:=lngxlAndOr, _
+'                    Criteria2:=strAutoFilterCriteria2
+'            Else
+                tblOutput.Range.AutoFilter Field:=lngIndex, _
+                    Criteria1:=strAutoFilterCriteria1
+'            End If
+
+SkipFilterOnField:
+        Next l
+        
+        ' Apply Filters on Output field
+        If Not ifOutputifOverWrite Then tblOutput.Range.AutoFilter Field:=lngOutputField_Index, Criteria1:="="
+        
+        ' Populate Output Values
+        If tblOutput.ListColumns(1).Range.SpecialCells(xlCellTypeVisible).Count > 1 Then
+            tblOutput.ListColumns(strOutputFieldName).DataBodyRange.Value = strOutputValue
+        End If
+        
+        ' Remove Filters
+        tblOutput.AutoFilter.ShowAllData
+        
+    End If
+Next
+
+Call CRTcread_Outputfile
+
+
+
+End Sub
+
+Function GetAutoFilterCriteria(strOperator As String, strCriteriaText As String) As String
+    
+    Select Case LCase(strOperator)
+        Case "equals", "equal to"
+            GetAutoFilterCriteria = strCriteriaText
+        Case "does not equal", "not equal to"
+            GetAutoFilterCriteria = "<>" & strCriteriaText
+        Case "begins with"
+            GetAutoFilterCriteria = strCriteriaText & "*"
+        Case "does not begins with", "does not begin with"
+            GetAutoFilterCriteria = "<>" & strCriteriaText & "*"
+        Case "ends with"
+            GetAutoFilterCriteria = "*" & strCriteriaText
+        Case "does not ends with", "does not end with"
+            GetAutoFilterCriteria = "<>*" & strCriteriaText
+        Case "contains"
+            GetAutoFilterCriteria = "*" & strCriteriaText & "*"
+        Case "does not contain"
+            GetAutoFilterCriteria = "<>*" & strCriteriaText & "*"
+        Case "greater than"
+            GetAutoFilterCriteria = ">" & strCriteriaText
+        Case "greater than or equal to"
+            GetAutoFilterCriteria = ">=" & strCriteriaText
+        Case "less than"
+            GetAutoFilterCriteria = "<" & strCriteriaText
+        Case "less than or equal to"
+            GetAutoFilterCriteria = "<=" & strCriteriaText
+    End Select
+
+End Function
+
+
+
+
+
+
+
+Option Explicit
+Option Base 1
+
+Public Function GetCellInATable(ws As Worksheet, tbl As ListObject, r As Long, c As String)
+    
+    GetCellInATable = ws.Cells(r, tbl.ListColumns(c).Range.Column).Value
+
+End Function
+
+Public Sub SelectCurrentRegionDown(InputRange As Range)
+    
+    Dim x As Long
+    x = InputRange.CurrentRegion.Rows.Count + InputRange.CurrentRegion.Row - 1
+    Range(InputRange, Cells(x, InputRange.Column)).Select
+
+End Sub
+
+Public Sub MoveDataAsString(FromTable As ListObject, ToTable As ListObject, ColumnName As String)
+    
+    Dim myArray() As Variant, i As Long, rng As Range
+    ReDim Preserve myArray(FromTable.ListColumns(ColumnName).DataBodyRange.Count, 1)
+    i = 0
+    
+    For Each rng In FromTable.ListColumns(ColumnName).DataBodyRange
+        i = i + 1
+        myArray(i, 1) = CStr(rng.Value)
+    Next rng
+    ToTable.ListColumns(ColumnName).DataBodyRange.Resize(UBound(myArray, 1), 1) = myArray
+    
+End Sub
+
+Sub ConvertToText(myRange As Range)
+    Dim rng As Range
+    myRange.NumberFormat = "@"
+    For Each rng In myRange
+        rng.Value = Trim(CStr(rng.Value))
+    Next rng
+End Sub
+
+Public Sub CleanTrimRange(InputRange As Range)
+
+    Dim myArray() As Variant, i As Long, rng As Range
+    ReDim Preserve myArray(InputRange.Count, 1)
+    i = 0
+    
+    For Each rng In InputRange
+        i = i + 1
+        myArray(i, 1) = WorksheetFunction.Clean(Trim(rng.Value))
+    Next rng
+    InputRange = myArray
+
+End Sub
+
+
+
+Public Function TestFind(FindWorkSheet As Worksheet, FindRange As Range, FindWhat As String)
+
+On Error GoTo StringNotFound
+TestFind = FindRange.Find(what:=FindWhat, after:=FindWorkSheet.Range("A1"), LookIn:=xlFormulas, lookat:=xlWhole, SearchOrder:=xlByRows, _
+    SearchDirection:=xlNext, MatchCase:=False, SearchFormat:=False).Address
+Exit Function
+
+StringNotFound:
+TestFind = "String Not Found"
+
+End Function
+
+Public Sub CustomSortAscending(myWS As Worksheet, myTbl As ListObject, strColumnName As String)
+
+    myTbl.Sort.SortFields.Clear
+    myTbl.Sort.SortFields.Add Key:=myTbl.ListColumns(strColumnName).Range, SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
+    With myTbl.Sort
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+
+End Sub
+
+Sub TempShutDown(myWB As Workbook, strException1 As String, strException2 As String, strException3 As String)
+    
+    Call SetWBPasswords
+    Dim myWS As Worksheet
+    For Each myWS In myWB.Worksheets
+        myWS.Protect wsPassword
+        If myWS.Name <> strException1 And myWS.Name <> strException2 And myWS.Name <> strException3 Then
+            myWS.Visible = xlSheetHidden
+        End If
+    Next myWS
+    wsAvailableMacros.EnableSelection = xlNoSelection
+    myWB.Protect wbPassword, Structure:=True
+    
+End Sub
+
+Sub OpenWB(myWB As Workbook)
+    
+    Call SetWBPasswords
+    Dim myWS As Worksheet
+    myWB.Unprotect wbPassword
+    For Each myWS In myWB.Worksheets
+        myWS.Unprotect wsPassword
+        myWS.Visible = xlSheetVisible
+    Next myWS
+    
+End Sub
+
+Sub FormatShapeAsLabel(myShape As Shape)
+
+    With myShape
+        .ShapeStyle = msoShapeStylePreset8
+        .TextFrame2.VerticalAnchor = msoAnchorMiddle
+        .TextFrame2.TextRange.ParagraphFormat.Alignment = msoAlignLeft
+        .TextFrame2.TextRange.Font.Bold = msoTrue
+        
+        With .Line
+            .Visible = msoTrue
+            .Weight = 1
+            .ForeColor.ObjectThemeColor = msoThemeColorBackground1
+        End With
+
+    End With
+
+End Sub
+
+Sub FormatShapeAsButton(myShape As Shape)
+    
+    With myShape
+        .ShapeStyle = msoShapeStylePreset9
+        .TextFrame2.VerticalAnchor = msoAnchorMiddle
+        .TextFrame2.TextRange.ParagraphFormat.Alignment = msoAlignCenter
+        .TextFrame2.TextRange.Font.Bold = msoTrue
+    End With
+    
+End Sub
+
+Sub CleanDirtyCellsInRange(myRange As Range)
+    
+    Dim rng As Range
+    For Each rng In myRange
+    If rng.Value = "" Then: rng.Clear
+    Next rng
+
+End Sub
+
+Sub MasterProtection()
+    
+    If wsAvailableMacros.Shapes(Application.Caller).TextFrame2.TextRange.Characters.Text <> "MASTER PROTECT" Then
+        If Environ("Username") = "meenakshisundharam.s" Or Environ("Username") = "ravikiran.visa" Then
+            Call InitializeVariables("AAA")
+            wsAvailableMacros.Shapes(Application.Caller).TextFrame2.TextRange.Characters.Text = "MASTER PROTECT"
+        Else
+            MsgBox "Please contact SAP team"
+        End If
+    Else
+        wsAvailableMacros.Shapes(Application.Caller).Delete
+'        Call TempShutDown(ThisWorkbook, "AvailableMacros", "Info", "ConsolidationListing")
+    End If
+    
+End Sub
+
+Sub ApplySortOnTable(tblSortOnTable As ListObject, strSortOnFieldName As String, lngSortOrder As Long)
+
+    With tblSortOnTable.Sort.SortFields
+        .Clear
+        .Add Key:=tblSortOnTable.ListColumns(strSortOnFieldName).DataBodyRange, SortOn:=xlSortOnValues, Order:=lngSortOrder, DataOption:=xlSortNormal
+    End With
+    
+    With tblSortOnTable.Sort
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+
+End Sub
+
+Sub AddFieldNotFoundinTable(tblSource As ListObject, strFieldName As String)
+
+Dim t As Integer
+
+        On Error GoTo AddField:
+        t = tblSource.ListColumns(strFieldName).Index
+        tblSource.ListColumns(strFieldName).DataBodyRange.ClearContents
+        Exit Sub
+    
+AddField::
+tblSource.ListColumns.Add.Name = strFieldName
+Exit Sub
+
+End Sub
+
+Sub TableSortFunction(tblSort As ListObject, strFieldName As String, intOrder As Integer)
+
+    With tblSort.Sort
+        .SortFields.Clear
+        .SortFields.Add Key:=tblSort.ListColumns(strFieldName).DataBodyRange, Order:=intOrder
+        .Header = xlYes
+        .MatchCase = False
+        .Apply
+    End With
+
+End Sub
+
+Sub DataFillinRange(tblOutput As ListObject, strFieldName As String, strFormula As String, strNumberFormat1 As String, strNumberFormat2 As String)
+
+'call DataFillinRange(tblOutput , strFieldName , strFormula , strNumberFormat1 , strNumberFormat2 )
+
+With tblOutput.ListColumns(strFieldName).DataBodyRange
+    .ClearContents
+    .NumberFormat = strNumberFormat1
+    .FormulaR1C1 = "=" & strFormula
+    .Value = .Value
+    If strNumberFormat2 <> "" Then .NumberFormat = strNumberFormat2
+End With
+
+End Sub
+
+Sub DataFillinBlanks(tblOutput As ListObject, strFieldName As String)
+
+With tblOutput.ListColumns(strFieldName).DataBodyRange.SpecialCells(xlCellTypeBlanks)
+    .NumberFormat = "General"
+    .FormulaR1C1 = "=R[-1]C"
+End With
+
+With tblOutput.ListColumns(strFieldName).DataBodyRange
+    .Value = .Value
+End With
+
+End Sub
+
+Sub SerialNumberFilling(tblOutput As ListObject, strFieldName As String)
+
+With tblOutput.ListColumns(strFieldName).DataBodyRange
+    .NumberFormat = "General"
+    .ClearContents
+    .Resize(1, 1) = 1
+    .DataSeries Type:=xlDataSeriesLinear
+End With
+
+End Sub
+
+Sub LookUpWithData(tblClaimLines As ListObject, tblRemarks As ListObject, strInputValue1 As String, strInputValue2 As String, strDelim As String)
+
+Dim varTemp
+Dim lngRow As Long
+Dim cell As Range
+Dim strCleansedInput As String, CumRemarkCode, CumRemarkText As String
+
+For Each cell In tblClaimLines.ListColumns("Temp_Remark").DataBodyRange
+
+CumRemarkCode = ""
+CumRemarkText = ""
+strCleansedInput = WorksheetFunction.Trim(cell.Value)
+
+    For Each varTemp In Split(strCleansedInput, strDelim)
+        
+        If WorksheetFunction.Trim(varTemp) <> "" Then
+        
+            lngRow = tblRemarks.ListColumns("ID").DataBodyRange.Find(what:=CStr(varTemp)).Row
+            
+            If CumRemarkCode = "" Then
+                CumRemarkCode = CumRemarkCode & tblRemarks.ListColumns("Remark Code").DataBodyRange.Cells(lngRow - 1).Value
+            Else
+                CumRemarkCode = CumRemarkCode & ";" & tblRemarks.ListColumns("Remark Code").DataBodyRange.Cells(lngRow - 1).Value
+            End If
+            
+            If CumRemarkText = "" Then
+                CumRemarkText = CumRemarkText & tblRemarks.ListColumns("Remark Text").DataBodyRange.Cells(lngRow - 1).Value
+            Else
+                CumRemarkText = CumRemarkText & ";" & tblRemarks.ListColumns("Remark Text").DataBodyRange.Cells(lngRow - 1).Value
+            End If
+            
+        End If
+        
+        tblClaimLines.ListColumns(strInputValue1).DataBodyRange.Cells(cell.Row - 1).Value = CumRemarkCode
+        tblClaimLines.ListColumns(strInputValue2).DataBodyRange.Cells(cell.Row - 1).Value = CumRemarkText
+        
+    Next
+
+Next
+
+End Sub
+
+Function RemoveDuplicates(strInputValue As String, strDelim As String) As String
+'Function RemoveDuplicatesInCarrier(strInputValue As String, Optional strDelim As String = " ") As String
+
+Dim varTemp, g(), k
+Dim strValue As String
+Dim strCleansedInput As String, ifValidCodes As Boolean
+
+strCleansedInput = WorksheetFunction.Substitute(WorksheetFunction.Trim(strInputValue), "'", "")
+
+With CreateObject("Scripting.Dictionary")
+    .CompareMode = vbTextCompare
+    
+    For Each varTemp In Split(strCleansedInput, strDelim)
+        
+        If WorksheetFunction.Trim(varTemp) <> "" Then
+            
+            If Not .Exists(WorksheetFunction.Trim(varTemp)) Then   '------- Checking if it's a valid code
+                .Add WorksheetFunction.Trim(varTemp), Nothing
+            End If
+        End If
+    Next varTemp
+    
+    ReDim g(1 To 1)
+    For Each k In .Keys
+        ReDim Preserve g(1 To UBound(g) + 1)
+        g(UBound(g)) = k
+    Next k
+    
+    If .Count > 0 Then RemoveDuplicates = WorksheetFunction.Trim(Join(g, " "))
+    
+End With
+
+End Function
+
+Sub PivotTable(wbInput As Workbook, tblData As ListObject, strValue As String)
+
+Dim wsName As String
+Dim cell As Range
+Dim wsPivot As Worksheet
+Dim pc As PivotCache
+Dim pt As PivotTable
+Dim tblSource As ListObject
+
+wbInput.Activate
+Set wsPivot = Sheets.Add(before:=wbInput.Sheets("Data"))
+
+wsName = "" & tblData.Name & ""
+
+Set pc = ActiveWorkbook.PivotCaches.Create(xlDatabase, wsName)
+Set pt = pc.CreatePivotTable(wsPivot.Range("A1"))
+
+With pt
+
+    .ClearAllFilters
+    .PivotFields("Process").Orientation = xlPageField
+    .PivotFields("Process").CurrentPage = strValue
+    
+    .AddDataField .PivotFields("Placement File"), "Count", xlCount
+    .AddDataField .PivotFields("TotalCharges"), "TTotalCharges", xlSum
+    .AddDataField .PivotFields("CurrentBalance"), "TCurrentBalance", xlSum
+
+    .PivotFields("Placement File").Orientation = xlRowField
+    .PivotFields("AGSCount").Orientation = xlRowField
+
+    .PivotFields("Placement File").Subtotals(1) = False
+    .PivotFields("AGSCount").Subtotals(1) = False
+    
+    .RowAxisLayout xlTabularRow
+    .RepeatAllLabels xlRepeatLabels
+    .ColumnGrand = False
+    .RowGrand = False
+
+End With
+
+'DoEvents
+Call PivotToTable(wsPivot, "Placement File", "tblPivot", "Process summary")
+
+Set tblSource = wsPivot.ListObjects(1)
+
+tblSource.DataBodyRange.ColumnWidth = 15
+
+Set pc = Nothing
+Set pt = Nothing
+
+End Sub
+
+Sub PivotToTable(wsPivot As Worksheet, strFieldName As String, strTableName As String, strSheetName As String)
+
+Dim lngRow As Long
+Dim tblPivot As ListObject
+
+wsPivot.Name = strSheetName
+
+wsPivot.Cells.Copy
+wsPivot.Cells(1, 1).PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+
+wsPivot.Activate
+lngRow = wsPivot.Cells.Find(strFieldName).Row
+If lngRow > 1 Then wsPivot.Range(Cells(1, 1), Cells(lngRow - 1, 1)).EntireRow.Delete
+
+wsPivot.ListObjects.Add(xlSrcRange, wsPivot.Range("A1").CurrentRegion, , xlYes).Name = strTableName
+Set tblPivot = wsPivot.ListObjects(strTableName)
+tblPivot.TableStyle = ""
+
+End Sub
+
+Sub PivotAGSActionCount(wbInput As Workbook, tblData As ListObject)
+
+Dim wsName As String
+Dim cell As Range
+Dim wsPivot As Worksheet
+Dim pc As PivotCache
+Dim pt As PivotTable
+Dim tblProcessCount As ListObject
+
+wbInput.Activate
+Set wsPivot = Sheets.Add(before:=wbInput.Sheets("Data"))
+
+wsName = "" & tblData.Name & ""
+
+Set pc = ActiveWorkbook.PivotCaches.Create(xlDatabase, wsName)
+Set pt = pc.CreatePivotTable(wsPivot.Range("A1"))
+
+With pt
+
+    .ClearAllFilters
+    .PivotFields("AGSActioned").Orientation = xlPageField
+    .PivotFields("AGSActioned").CurrentPage = "1"
+    
+    .AddDataField .PivotFields("AccountNumber"), "Count", xlCount
+    
+    .PivotFields("Placement File").Orientation = xlRowField
+
+    .PivotFields("Placement File").Subtotals(1) = False
+    
+    .RowAxisLayout xlTabularRow
+    .RepeatAllLabels xlRepeatLabels
+    .ColumnGrand = False
+    .RowGrand = False
+
+End With
+
+'DoEvents
+Call PivotToTable(wsPivot, "Placement File", "tblProcessCount", "Process Count")
+Set tblProcessCount = wsPivot.ListObjects(1)
+
+tblProcessCount.DataBodyRange.ColumnWidth = 15
+
+Set pc = Nothing
+Set pt = Nothing
+
+End Sub
+
+Sub CreatePivotCarrierCount(wbInput As Workbook, tblData As ListObject, tblTProcess As ListObject)
+
+Dim RowsFoundFlag As Boolean
+Dim lngRow As Long
+Dim strFname As String
+Dim cell As Range
+Dim pc As PivotCache
+Dim pt As PivotTable
+Dim tblPivot As ListObject
+Dim tblTSource As ListObject
+Dim wsPivot As Worksheet
+Dim wsName As String
+
+wbInput.Activate
+wsName = "" & tblData.Name & ""
+
+For Each cell In tblTProcess.ListColumns("Process").DataBodyRange
+
+RowsFoundFlag = False
+
+tblInput.Range.AutoFilter Field:=tblInput.ListColumns("Process").Index, Criteria1:=cell.Value
+If tblInput.ListColumns(1).Range.SpecialCells(xlCellTypeVisible).Count > 1 Then
+RowsFoundFlag = True
+End If
+tblInput.AutoFilter.ShowAllData
+
+    If RowsFoundFlag Then
+    
+        Set wsPivot = Sheets.Add(before:=wbInput.Sheets("Data"))
+        
+        Set pc = ActiveWorkbook.PivotCaches.Create(xlDatabase, wsName)
+        Set pt = pc.CreatePivotTable(wsPivot.Range("A1"))
+        
+        With pt
+        
+            .ClearAllFilters
+            .PivotFields("Process").Orientation = xlPageField
+            .PivotFields("Process").CurrentPage = cell.Value
+            
+            .PivotFields("Placement File").Orientation = xlRowField
+            .PivotFields("Received Date").Orientation = xlRowField
+            
+            .AddDataField .PivotFields("Account Number"), "TempFR Accounts Received", xlCount
+            .AddDataField .PivotFields("AGS Pending"), "TempAGS Pending", xlSum
+            .AddDataField .PivotFields("TotalCharges"), "TempTotal Charges", xlSum
+            .AddDataField .PivotFields("Current Balance"), "TempCurrent Balance", xlSum
+        
+            .PivotFields("Placement File").Subtotals(1) = False
+            
+            .RowAxisLayout xlTabularRow
+            .RepeatAllLabels xlRepeatLabels
+            .ColumnGrand = False
+            .RowGrand = False
+        
+        End With
+        
+        Set pc = Nothing
+        Set pt = Nothing
+        
+        strFname = "'" & wbInput.Name & "'!"
+        
+        wsPivot.Name = cell.Value
+        
+        wsPivot.Cells.Copy
+        wsPivot.Cells(1, 1).PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=False
+        
+        wsPivot.Activate
+        lngRow = wsPivot.Cells.Find("Placement File").Row
+        If lngRow > 1 Then wsPivot.Range(Cells(1, 1), Cells(lngRow - 1, 1)).EntireRow.Delete
+        
+        wsPivot.ListObjects.Add(xlSrcRange, wsPivot.Range("A1").CurrentRegion, , xlYes).Name = "tblTSource"
+        Set tblTSource = wsPivot.ListObjects("tblTSource")
+        tblTSource.TableStyle = ""
+        
+        tblTSource.HeaderRowRange.Replace what:="Temp", replacement:="", lookat:=xlPart
+        
+        tblTSource.ListColumns.Add(Position:=tblTSource.ListColumns("AGS Pending").Index).Name = "AGS Actioned"
+        
+        With tblTSource.ListColumns("AGS Actioned").DataBodyRange
+            .NumberFormat = "General"
+            .FormulaR1C1 = "=[@[FR Accounts Received]]-[@[AGS Pending]]"
+            .Value = .Value
+        End With
+        
+        tblTSource.ListRows.Add (tblTSource.ListRows.Count + 1)
+        
+        tblTSource.ListColumns("Placement File").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "Total"
+        tblTSource.ListColumns("FR Accounts Received").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "=Sum(R[-" & tblTSource.ListRows.Count - 1 & "]C:R[-1]C)"
+        tblTSource.ListColumns("AGS Actioned").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "=Sum(R[-" & tblTSource.ListRows.Count - 1 & "]C:R[-1]C)"
+        tblTSource.ListColumns("AGS Pending").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "=Sum(R[-" & tblTSource.ListRows.Count - 1 & "]C:R[-1]C)"
+        tblTSource.ListColumns("Total Charges").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "=Sum(R[-" & tblTSource.ListRows.Count - 1 & "]C:R[-1]C)"
+        tblTSource.ListColumns("Current Balance").DataBodyRange.Cells(tblTSource.ListRows.Count, 1).Value = "=Sum(R[-" & tblTSource.ListRows.Count - 1 & "]C:R[-1]C)"
+        
+        With tblTSource.DataBodyRange
+            .Borders.LineStyle = xlContinuous
+            .Borders.ColorIndex = 0
+            .Borders.TintAndShade = 0
+            .Borders.Weight = xlThin
+        
+            .Font.Name = "Trebuchet MS"
+            .Font.Size = 10
+            .Font.Underline = xlUnderlineStyleNone
+            .Font.ThemeColor = xlThemeColorLight1
+            .Font.TintAndShade = 0
+            .Font.ThemeFont = xlThemeFontNone
+        End With
+
+        With tblTSource.ListRows(tblTSource.ListRows.Count).Range.Interior
+            .Pattern = xlSolid
+            .PatternColorIndex = xlAutomatic
+            .ThemeColor = xlThemeColorAccent1
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+        End With
+
+        With tblTSource.HeaderRowRange.Interior
+            .Pattern = xlSolid
+            .PatternColorIndex = xlAutomatic
+            .ThemeColor = xlThemeColorAccent1
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+        End With
+        
+        Set wsPivot = Nothing
+        
+        tblTSource.ListColumns("Total Charges").DataBodyRange.NumberFormat = "$#,##0.00"
+        tblTSource.ListColumns("Current Balance").DataBodyRange.NumberFormat = "$#,##0.00"
+        With tblTSource.ListColumns("Received Date").DataBodyRange
+            .NumberFormat = "mm/dd/yyyy"
+            .Value = .Value
+        End With
+        
+        tblTSource.Range.AutoFilter Field:=tblTSource.ListColumns("AGS Pending").Index, Criteria1:=0
+        If tblTSource.ListColumns(1).Range.SpecialCells(xlCellTypeVisible).Count > 1 Then
+            Application.DisplayAlerts = False
+            tblTSource.DataBodyRange.SpecialCells(xlCellTypeVisible).Delete
+            Application.DisplayAlerts = True
+        End If
+        tblTSource.AutoFilter.ShowAllData
+        
+        RowsFoundFlag = False
+        
+        tblTSource.Range.AutoFilter Field:=tblTSource.ListColumns("Placement File").Index, Criteria1:=""
+        If tblTSource.ListColumns(1).Range.SpecialCells(xlCellTypeVisible).Count > 1 Then
+            RowsFoundFlag = True
+        End If
+        tblTSource.AutoFilter.ShowAllData
+        
+        If Not RowsFoundFlag Then
+            Call ApplySortOnTable(tblTSource, "Received Date", 1)
+        End If
+        
+'        tblTSource.ListColumns("Current Balance").DataBodyRange.ColumnWidth = 15
+        
+        tblTSource.Unlist
+
+    End If
+
+Next
+
+    
+End Sub
+
+Sub CopyDataFromMultipleWB(tblTSource As ListObject, wbSTemp As Workbook, strFileName As String)
+                
+Dim lngRows As Long
+Dim alistcolumn As ListColumn
+Dim tblTemp As ListObject
+Dim wsTTemp As Worksheet
+Dim wbTTemp As Workbook
+                
+lngRows = tblTSource.ListRows.Count + 1
+
+Workbooks.Open (wbSTemp.path & "\" & strFileName)
+Set wbTTemp = ActiveWorkbook
+ActiveSheet.Cells.Copy
+wbTTemp.Sheets.Add before:=wbTTemp.Sheets(1)
+Set wsTTemp = wbTTemp.ActiveSheet
+wsTTemp.Cells(1, 1).PasteSpecial (xlPasteValuesAndNumberFormats)
+
+wsTTemp.ListObjects.Add(xlSrcRange, wsTTemp.Range("A1").CurrentRegion, , xlYes).Name = "tblTemp"
+Set tblTemp = wsTTemp.ListObjects("tblTemp")
+tblTemp.TableStyle = ""
+
+'tblTemp.ListColumns.Add.Name = "Placement Date1"
+'tblTemp.ListColumns.Add.Name = "Placement Date"
+'
+'With tblTemp.ListColumns("Placement Date1").DataBodyRange
+'    .Value = Mid(wbTTemp.Name, WorksheetFunction.Find(".xls", wbTTemp.Name) - 8, 8)
+'End With
+'
+'With tblTemp.ListColumns("Placement Date").DataBodyRange
+'    .NumberFormat = "General"
+'    .FormulaR1C1 = "=Date(RIGHT([@[Placement Date1]],4),IF(LEN([@[Placement Date1]])=7,LEFT([@[Placement Date1]],1),LEFT([@[Placement Date1]],2)),IF(LEN([@[Placement Date1]])=7,MID([@[Placement Date1]],2,2),MID([@[Placement Date1]],3,2)))"
+'    .Value = .Value
+'End With
+    
+With tblTSource
+    For Each alistcolumn In .ListColumns
+        With alistcolumn
+            tblTemp.ListColumns(.Name).DataBodyRange.Copy tblTSource.ListColumns(.Name).DataBodyRange.Cells(lngRows, 1)
+        End With
+    Next alistcolumn
+  End With
+
+wbTTemp.Close False
+                
+End Sub
+
+
+
+Sub CRTcread_Outputfile()
+Dim wb As Workbook
+Dim sh4 As Worksheet
+Dim sh3 As Worksheet
+Dim path As String
+Dim fso As FileSystemObject
+Dim rng As Range
+
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+Set wb = ThisWorkbook
+Set sh3 = wb.Sheets("CRTdata")
+Set sh4 = wb.Sheets("Home")
+For Each objtbl In sh3.ListObjects
+    objtbl.Unlist
+Next
+
+sh3.AutoFilterMode = False
+fndsht = sh3.Range("1:1").Find(what:="Client Names", LookIn:=xlValues).Column
+path = sh4.Range("H17").Value
+fdrg = sh3.Range("1:1").Find(what:="Client Names", LookIn:=xlValues).Address
+clintrg = Left(Replace(fdrg, "$", ""), Len(Replace(fdrg, "$", "")) - 1)
+
+
+Set opnwb = Workbooks.Open(path)
+
+If opnwb.ReadOnly Then
+    Set objnet = CreateObject("WScript.NetWork")
+    opnusername = objnet.UserName
+    MsgBox "File is already opened by " & opnusername & ", So please close the workbook!"
+    'clientwb.Close savechanges:=False
+    Exit Sub
+End If
+
+'Find sheets and pasted respective values
+
+For Each ws In opnwb.Sheets
+    shname = ws.Name
+    fndshtname = Application.WorksheetFunction.IfError(Application.Match(ws.Name, sh3.Range(clintrg & ":" & clintrg), 0), 0)
+    If fndshtname > 1 Then
+        sh3.AutoFilterMode = False
+        opnwb.Sheets(shname).Activate
+        Set Rg = sh3.Range("a1").CurrentRegion
+                                    
+    With Rg
+        .AutoFilter Field:=fndsht, Criteria1:=shname, Operator:=xlFilterValues
+        rw = Application.WorksheetFunction.Subtotal(3, sh3.Range("A:A")) - 1
+    End With
+    
+    lastrw = sh3.Range("a1048576").End(xlUp).Row
+        If lastrw = 1 Then
+        
+    Else
+                   
+        opnwb.Activate
+        fdrw = Range("1:8").Find(what:="Raised By", LookIn:=xlValues, lookat:=xlWhole).Row
+        fdcl = Range("1:8").Find(what:="Raised By", LookIn:=xlValues, lookat:=xlWhole).Column
+        Cells(fdrw + 1, 1).EntireRow.Offset(1).Resize(rw).Insert shift:=xlDown
+        'lastcl = Cells(fd, Columns.Count).End(xlToLeft).Column
+        k = 0
+        c = 0
+        sc = 0
+        an = 0
+        bn = 0
+        cn = 0
+        
+        'Output find sheets values with CRT data and loop run to while didn't met values
+        Do While opnwb.Sheets(shname).Cells(fdrw, fdcl + k).Value <> ""
+        clienthd = opnwb.Sheets(shname).Cells(fdrw, fdcl + k).Value
+            'CRT data considering changes heading
+            If clienthd = "Instance" Then
+                c = c + 1
+                clienthd = clienthd & c
+            ElseIf clienthd = "Sort Code" Then
+                sc = sc + 1
+                clienthd = clienthd & sc
+            ElseIf clienthd = "Account Number" Then
+                an = an + 1
+                clienthd = clienthd & an
+            ElseIf clienthd = "IBAN" Then
+                bn = bn + 1
+                If clienthd & bn = "IBAN1" Then
+                    clienthd = "IBAN Account From"
+                ElseIf clienthd & bn = "IBAN2" Then
+                    clienthd = "IBAN Account To"
+                End If
+                
+            ElseIf clienthd = "Account Name" Then
+                cn = cn + 1
+                clienthd = clienthd & cn
+            ElseIf clienthd = "BIC/Swift Code" Then
+                clienthd = clienthd & " Account To"
+                                            
+                
+            ElseIf clienthd = "Narrative" Then
+                
+                cc = opnwb.Sheets(shname).Cells(fdrw, fdcl + k).Offset(1, 0).Copy
+                Range(Cells(fdrw + 1, fdcl + k), Cells(fdrw + rw + 1, fdcl + k)).PasteSpecial Paste:=xlPasteFormulas
+                'opnwb.Sheets(sh).Range(Cells(fdrw + 1, fdcl + k), Cells(fdrw + 1, rw)).Select
+    '        Else
+    '            MsgBox "Kindly check payments or Sign Off sheets hearders, It was mismatched.", vbCritical
+    '            Exit Sub
+            End If
+    
+        sh3.Activate
+        On Error Resume Next
+        Set payheader = ThisWorkbook.Sheets("CRTdata").Range("1:1").Find(what:=clienthd, LookIn:=xlValues, lookat:=xlWhole)
+        payad = Left(payheader.Address, 2)
+        phd = payheader.Value
+        On Error GoTo 0
+        If payheader Is Nothing Then
+            k = k + 1
+        ElseIf clienthd = phd Then
+            finalrowfiltered = Range("A" & Rows.Count).End(xlUp).Row
+            
+            sh3.Range(payad & "$2", payad & "$" & finalrowfiltered).SpecialCells(xlCellTypeVisible).Copy
+            opnwb.Sheets(shname).Activate
+            opnwb.Sheets(shname).Cells(fdrw, fdcl + k).Offset(1, 0).Select
+            Selection.PasteSpecial Paste:=xlPasteValues
+            fdlastrw = Range(ActiveCell, ActiveCell).End(xlDown).Row
+            'valrw = Range(Selection, Selection).End(xlDown).Row
+            'Above 25000 values find and create a new sheet
+            If clienthd = "Value" Then
+                opnwb.Sheets(shname).Activate
+                lrw = 1
+                
+                Do Until IsEmpty(opnwb.Sheets(shname).Cells(lrw + fdrw, fdcl + k).Value)
+                'For v = 1 To fdlastrw
+                    opnwb.Sheets(shname).Activate
+                    abval = opnwb.Sheets(shname).Cells(fdrw + lrw, fdcl + k).Value
+                    
+                    If abval >= 25000.01 Then
+                        drw = drw + 1
+                        opnwb.Sheets(shname).Cells(fdrw + lrw, fdcl + k + 14).Select
+                        opnwb.Sheets(shname).Cells(fdrw + lrw, fdcl + k + 14).Value = drw
+                        opnwb.Sheets(shname).Copy after:=Sheets(shname) ' copy duplicate sheet
+                        'Find the sheet name
+                        actsht = ActiveWorkbook.ActiveSheet.Name
+                        opnwb.Sheets(actsht).Activate
+                        opnwb.Sheets(actsht).Cells(fdrw, fdcl + k).Offset(1, 0).Select
+                        
+                        ' 25000 below values removed in activesheet
+                        curw = 1
+                        Do Until IsEmpty(opnwb.Sheets(actsht).Cells(curw + fdrw, fdcl + k).Value)
+                        
+                            rwvl = opnwb.Sheets(actsht).Cells(curw + fdrw, fdcl + k).Value
+                            drw1 = Cells(fdrw + curw, fdcl + k + 14).Value
+                            If rwvl = abval And drw = drw1 Then
+                                Cells(curw + fdrw, 1).EntireRow.Select
+                            Else
+                                Cells(curw + fdrw, 1).EntireRow.Select
+                                Cells(curw + fdrw, 1).EntireRow.Delete
+                                curw = curw - 1
+                            End If
+                        
+                        curw = curw + 1
+                        Loop
+                    '25000 above values deleted from actuall sheet
+                    opnwb.Sheets(shname).Activate
+                    opnwb.Sheets(shname).Cells(fdrw + lrw, fdcl + k).EntireRow.Select
+                    opnwb.Sheets(shname).Cells(fdrw + lrw, fdcl + k).EntireRow.Delete
+                    lrw = lrw - 1
+                    
+                    End If
+                'Next
+                
+                lrw = lrw + 1
+                Loop
+            End If
+                                                
+            k = k + 1
+        End If
+        Loop
+    End If
+    End If
+Application.CutCopyMode = False
+
+Next
+
+sh3.AutoFilterMode = False
+fldpath = ThisWorkbook.path & "\Output Investment"
+cc = Format(Now(), "dd-mm-yyyy hh mm")
+wbname = Left(opnwb.Name, InStr(1, opnwb.Name, ".") - 1)
+'MsgBox wbname
+
+'Output excel file save in the seperate folder path
+Set fso = New FileSystemObject
+If Not fso.FolderExists(fldpath) Then
+    fso.CreateFolder fldpath
+End If
+
+
+opnwb.SaveAs fldpath & "\" & wbname & cc & ".xlsx"
+opnwb.Close savechanges:=False
+
+Application.DisplayAlerts = True
+Application.ScreenUpdating = True
+End Sub
+
+
+
+Sub Return_Source()
+'CRT data updated in return source file
+Dim wb As Workbook
+Dim sh1 As Worksheet
+Dim sh2, sh3 As Worksheet
+Dim wrkbk As Workbook
+Dim sh4 As Worksheet
+Dim ww As Range
+Dim rn, w, r As Integer
+Dim i As Integer
+
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh2 = wb.Sheets("Rawdata")
+Set sh3 = wb.Sheets("CRTdata")
+Set sh4 = wb.Sheets("Process")
+
+lstrw = sh3.Range("A" & Rows.Count).End(xlUp).Row
+fndsht = sh3.Range("1:1").Find(what:="SheetName", LookIn:=xlValues, lookat:=xlWhole).Address
+sp = Mid(fndsht, InStr(1, fndsht, "$") + 1, InStr(2, fndsht, "$") - InStr(1, fndsht, "$") - 1)
+lastwb = sh4.Range("AI" & Rows.Count).End(xlUp).Row
+
+rn = 0
+w = 2
+r = 2
+'For Each wrkbk In Workbooks
+For i = 2 To lastwb
+
+wk = sh4.Range("AI" & i).Value
+
+Workbooks(wk).Activate
+Set wrkbk = ActiveWorkbook
+
+wbname = wrkbk.Name
+Set wbfnd = sh4.Range("AI:AI").Find(what:=wbname, LookIn:=xlValues)
+'Set wrk = Workbooks.Open(ww)
+If Not wbfnd Is Nothing Then
+    shcunt = wrkbk.Sheets.Count
+    
+    For sh = 1 To shcunt
+        
+    shtname = wrkbk.Sheets(sh).Name
+    Set fd = sh3.Range(fndsht & ":" & sp & lstrw).Find(what:=shtname, LookIn:=xlValues)
+    If Not fd Is Nothing Then
+        cl = fd.Column
+        aa = sh3.Cells(r, cl)
+    Do While sh3.Cells(r, cl) <> ""
+        rowno = sh3.Cells(r + rn, 1).Value
+        shname = sh3.Cells(r + rn, cl).Value
+        cname = sh3.Cells(r + rn, cl + 3).Value
+        
+    If shtname = shname Then
+        Workbooks(wbname).Activate
+        wrkbk.Sheets(sh).Activate
+        lcol = Cells(4, Columns.Count).End(xlToLeft).Column
+        col1 = Cells(3, Columns.Count).End(xlToLeft).Column
+        If lcol < col1 Then
+            lcol = Cells(3, Columns.Count).End(xlToLeft).Column
+        End If
+        If cname = "" Then
+            'Given reference validated and added the comments source files
+            sh3.Activate
+            sdrw = sh3.Cells(r + rn, 6).Value
+            curitm = sh3.Cells(r + rn, 16).Value
+            ibanitm1 = sh3.Cells(r + rn, 22).Value
+            ibanitm2 = sh3.Cells(r + rn, 23).Value
+            swfitm = sh3.Cells(r + rn, 24).Value
+            'Reference validation
+            sh4.Activate
+            Set scfnd = sh4.Range("AF:AF").Find(what:=sdrw, LookIn:=xlValues)
+            If scfnd Is Nothing Then
+                cmts = "SortCode No Match"
+            ElseIf curitm = "" Then
+                cmts = "Currency Missing"
+            ElseIf ibanitm1 = "" Or ibanitm2 = "" Then
+                cmts = "IBAN Account Missing"
+            ElseIf swfitm = "" Or ibanitm2 = "" Then
+                cmts = "BIC/Swfut Code Missing"
+            Else
+                cmts = "Error No Match"
+            End If
+            wrkbk.Sheets(sh).Activate
+            Set fnd = wrkbk.Sheets(sh).Range("A:AA").Find(what:="*ENTRIES PROCESSED AND AWAITING RECONCILIATION ABOVE THIS LINE*", LookIn:=xlValues, lookat:=xlWhole, _
+            SearchOrder:=xlByRows, MatchCase:=False)
+            rws = fnd.Row
+            clm = fnd.Column
+            wrkbk.Sheets(sh).Cells(rws, lcol + 2).EntireRow.Select
+            wrkbk.Sheets(sh).Cells(rws, lcol + 2).EntireRow.Insert
+            wrkbk.Sheets(sh).Cells(rowno + 1, 28) = cmts & ", So Awaiting Reconciliation"
+            wrkbk.Sheets(sh).Cells(rowno + 1, lcol + 2).EntireRow.Copy
+            wrkbk.Sheets(sh).Cells(rws, clm).EntireRow.Select
+            Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+            Selection.PasteSpecial Paste:=xlPasteFormats
+            wrkbk.Sheets(sh).Cells(rowno + 1, lcol).EntireRow.Delete
+            'wrkbk.Sheets(sh).Cells(rowno, lcol + 2) = "Reference Not Match, Kindly check"
+        Else
+                                    
+            Set fnd1 = wrkbk.Sheets(sh).Range("A:AA").Find(what:="*ARCHIVED ENTRIES ABOVE THIS LINE*", LookIn:=xlValues, SearchOrder:=xlByRows, MatchCase:=False)
+            On Error GoTo 0
+            If fnd1 Is Nothing Then
+                MsgBox "Archived and Reconciliation Entires not available in payment!", vbInformation
+                'shh = wrkbk.Sheets(sh + 1).Name
+                fndsht1 = sh3.Range(sp & ":" & sp).Find(what:=shtname, LookIn:=xlValues, SearchDirection:=xlPrevious).Row + 1
+                On Error GoTo 0
+                r = fndsht1
+                Exit Do
+                
+            Else
+                rws = fnd1.Row
+                clm = fnd1.Column
+                wrkbk.Sheets(sh).Cells(rws, lcol + 2).EntireRow.Select
+                wrkbk.Sheets(sh).Cells(rws, lcol + 2).EntireRow.Insert
+                wrkbk.Sheets(sh).Range(Cells(rowno + 1, 2), Cells(rowno + 1, lcol)).Interior.ThemeColor = xlThemeColorAccent1
+                wrkbk.Sheets(sh).Cells(rowno + 1, 28) = "Successfully Moved"
+                wrkbk.Sheets(sh).Cells(rowno + 1, lcol + 2).EntireRow.Copy
+                wrkbk.Sheets(sh).Cells(rws, clm).EntireRow.Select
+                Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+                Selection.PasteSpecial Paste:=xlPasteFormats
+                wrkbk.Sheets(sh).Cells(rowno + 1, lcol).EntireRow.Delete
+            End If
+            
+        End If
+        r = r + 1
+    Else
+        r = r
+        'rn = sh3.Cells(r, cl).Row
+        Exit Do
+    End If
+    Loop
+    
+    End If
+    Next
+
+'w = w + 1
+End If
+'MsgBox "Maybe Payment sheets force closed, Kindly check the client workbook open or not!", vbInformation
+wrkbk.Close savechanges:=True
+Next
+
+Application.DisplayAlerts = True
+Application.ScreenUpdating = True
+End Sub
+Sub Return_Source1()
+
+Dim wb As Workbook
+Dim sh1 As Worksheet
+Dim sh2, sh3 As Worksheet
+Dim wrkbk As Workbook
+Dim sh4 As Worksheet
+Dim ww As Range
+Dim rn, w, r As Interior
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh2 = wb.Sheets("Rawdata")
+Set sh3 = wb.Sheets("CRTdata")
+Set sh4 = wb.Sheets("Process")
+
+lstrw = sh3.Range("A" & Rows.Count).End(xlUp).Row
+fndsht = sh3.Range("1:1").Find(what:="SheetName", LookIn:=xlValues, lookat:=xlWhole).Address
+sp = Mid(fndsht, InStr(1, fndsht, "$") + 1, InStr(2, fndsht, "$") - InStr(1, fndsht, "$") - 1)
+lastwb = sh4.Range("AI" & Rows.Count).End(xlUp).Row
+
+rn = 0
+w = 2
+r = 2
+'For Each wrkbk In Workbooks
+For i = 2 To lastwb
+
+wk = sh4.Range("AI" & i).Value
+
+Workbooks(wk).Activate
+Set wrkbk = ActiveWorkbook
+
+wbname = wrkbk.Name
+Set wbfnd = sh4.Range("AI:AI").Find(what:=wbname, LookIn:=xlValues)
+'Set wrk = Workbooks.Open(ww)
+If Not wbfnd Is Nothing Then
+    shcunt = wrkbk.Sheets.Count
+    
+    For sh = 1 To shcunt
+        
+    shtname = wrkbk.Sheets(sh).Name
+    Set fd = sh3.Range(fndsht & ":" & sp & lstrw).Find(what:=shtname, LookIn:=xlValues)
+    If Not fd Is Nothing Then
+        cl = fd.Column
+        aa = sh3.Cells(r, cl)
+    Do While sh3.Cells(r, cl) <> ""
+        rowno = sh3.Cells(r + rn, 1).Value
+        shname = sh3.Cells(r + rn, cl).Value
+        cname = sh3.Cells(r + rn, cl + 3).Value
+        
+    If shtname = shname Then
+
+        If cname = "" Then
+            Workbooks(wbname).Activate
+            wrkbk.Sheets(sh).Activate
+            wrkbk.Sheets(sh).Cells(rowno, 20) = "Reference Not Match, Kindly check"
+        Else
+            Workbooks(wbname).Activate
+            wrkbk.Sheets(sh).Activate
+            Set fnd = Range("A:AA").Find(what:="*ENTRIES PROCESSED*", LookIn:=xlValues)
+            On Error GoTo 0
+            If fnd Is Nothing Then
+                Set fnd1 = wrkbk.Sheets(sh).Range("A:AA").Find(what:="*ARCHIVED ENTRIES ABOVE THIS LINE*", LookIn:=xlValues)
+                On Error GoTo 0
+                If fnd1 Is Nothing Then
+                    MsgBox "Archived and Reconciliation Entires not available in payment!", vbInformation
+                    'shh = wrkbk.Sheets(sh + 1).Name
+                    fndsht1 = sh3.Range(sp & ":" & sp).Find(what:=shtname, LookIn:=xlValues, SearchDirection:=xlPrevious).Row + 1
+                    On Error GoTo 0
+                    r = fndsht1
+                    Exit Do
+                    
+                End If
+                rws = fnd1.Row
+                clm = fnd1.Column
+                wrkbk.Sheets(sh).Cells(rws, 20).EntireRow.Select
+                wrkbk.Sheets(sh).Cells(rws, 20).EntireRow.Insert
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20) = "Awaiting Reconciliation"
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20).EntireRow.Copy
+                wrkbk.Sheets(sh).Cells(rws, clm).EntireRow.Select
+                Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+                Selection.PasteSpecial Paste:=xlPasteFormats
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20).EntireRow.Delete
+                
+            Else
+                rws = fnd.Row
+                clm = fnd.Column
+                wrkbk.Sheets(sh).Cells(rws, 20).EntireRow.Select
+                wrkbk.Sheets(sh).Cells(rws, 20).EntireRow.Insert
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20) = "Awaiting Reconciliation"
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20).EntireRow.Copy
+                wrkbk.Sheets(sh).Cells(rws, clm).EntireRow.Select
+                Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+                Selection.PasteSpecial Paste:=xlPasteFormats
+                wrkbk.Sheets(sh).Cells(rowno + 1, 20).EntireRow.Delete
+            End If
+            
+        End If
+        r = r + 1
+        
+    Else
+        r = r
+        'rn = sh3.Cells(r, cl).Row
+        Exit Do
+    End If
+    Loop
+    
+    End If
+    Next
+'w = w + 1
+End If
+'MsgBox "Maybe Payment sheets force closed, Kindly check the client workbook open or not!", vbInformation
+
+Next
+End Sub
+
+
+
+Sub Return_SourceTest()
+Dim wb As Workbook
+Dim sh1 As Worksheet
+Dim sh2, sh3 As Worksheet
+Dim wrkbk As Workbook
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh2 = wb.Sheets("Rawdata")
+Set sh3 = wb.Sheets("CRTdata")
+
+lstrw = sh3.Range("A" & Rows.Count).End(xlUp).Row
+fs = sh3.Range("1:1").Find(what:="SheetName", LookIn:=xlValues, lookat:=xlWhole).Column
+   
+rn = 0
+For Each wrkbk In Workbooks
+wbname = wrkbk.Name
+If wrkbk.Name <> ThisWorkbook.Name Then
+    shcunt = wrkbk.Sheets.Count
+    
+    For sh = 1 To shcunt
+        Workbooks(wbname).Activate
+        wrkbk.Sheets(sh).Activate
+        Sname = wrkbk.Sheets(sh).Name
+        For r = 2 To lstrw - rn
+            rowno = sh3.Cells(r + rn, 1).Value
+            shname = sh3.Cells(r + rn, fs).Value
+            cname = sh3.Cells(r + rn, fs + 1).Value
+            
+        If wrkbk.Sheets(sh).Name = shname Then
+        
+            If cname = "" Then
+                wrkbk.Sheets(sh).Cells(rowno, 20) = "Reference Not Match"
+            Else
+                wrkbk.Sheets(sh).Cells(rowno, 20).EntireRow.Select
+                'Set Searchrng = wrkbk.Sheets(sh).Range("A1", Range("A65536").End(xlUp))
+                'Set Findrw = Searchrng.Find(what:=rowno, LookIn:=xlValues, lookat:=xlWhole)
+            End If
+        Else
+            rn = sh3.Cells(r, fs + 1).Row - 2
+            Exit For
+        End If
+        Next
+    Next
+End If
+    
+Next
+
+
+End Sub
+
+
+
+Sub CRT_Reference()
+Dim wb As Workbook
+Dim sh1 As Worksheet
+Dim sh3 As Worksheet
+Dim rng As Range
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+Set sh3 = wb.Sheets("CRTdata")
+sh3.AutoFilterMode = False
+sh3.Cells.Clear
+
+Set rng = sh1.Range("A1").CurrentRegion
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+lrow = sh1.Cells(Rows.Count, 3).End(xlUp).Row
+rng.Copy
+sh3.Activate
+sh3.Range("A1").PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+Application.CutCopyMode = False
+
+' Find and Replace values
+ary = Array("N/A", "#N/A")
+For i = 0 To 1
+    sh3.Range("D:D", "I:I").Replace what:=ary(i), replacement:="N/A", SearchOrder:=xlByColumns, MatchCase:=True
+Next i
+
+For j = 1 To lcol
+dd = Cells(1, j).Value
+    If Cells(1, j).Value = "Lloyds CBO Instance" Then
+        intn = intn + 1
+        Cells(1, j).Value = "Instance" & intn
+    ElseIf Cells(1, j).Value = "Sort Code" Then
+        sc = sc + 1
+        Cells(1, j).Value = "Sort Code" & sc
+    ElseIf Cells(1, j).Value = "Account Number" Then
+        an = an + 1
+        Cells(1, j).Value = "Account Number" & an
+    ElseIf Cells(1, j).Value = "IBAN Number" Then
+        bn = bn + 1
+        Cells(1, j).Value = "IBAN Number" & bn
+    ElseIf Cells(1, j).Value = "Account Name" Then
+        cn = cn + 1
+        Cells(1, j).Value = "Account Name" & cn
+    ElseIf Cells(1, j).Value = "Reference" Then
+        Cells(1, j).Value = "Ref No"
+    ElseIf Cells(1, j).Value = "Date" Then
+        Cells(1, j).Value = "Date BOP Raised"
+    ElseIf Cells(1, j).Value = "Amount" Then
+        Cells(1, j).Value = "Value"
+    ElseIf j = lcol Then
+        Cells(1, j + 1).Value = "Client Names"
+        
+    End If
+
+Next
+
+
+For Each obj In sh3.ListObjects
+    obj.Unlist
+Next
+sh3.ListObjects.Add(xlSrcRange, Range([A1].End(xlDown), [A1].End(xlToRight)), , xlYes).Name = "CRTable"
+Set tblCRT = sh3.ListObjects("CRTable")
+
+With tblCRT
+    .TableStyle = ""
+End With
+
+Call RunAdvancedFiltersEngine
+
+End Sub
+
+
+Sub copy_HT_rows()
+
+    Dim rng As Range
+    Sheets("Input").Select
+    Range("A1").Select
+
+    For Each rng In Sheets("input").Range("A1:A100")
+        If rng.Value = "HT" Then
+            Rows(rng.Row).Copy
+            Sheets("Records").Select
+            If (Range("A1") <> "") Then
+                Range("A10000").End(xlUp).Offset(1, 0).PasteSpecial xlPasteValues
+            Else
+                Range("A1").PasteSpecial xlPasteValues
+            End If
+            Sheets("Input").Select
+        End If
+    Next rng
+End Sub
+
+Sub Macro1()
+'
+' Macro1 Macro
+'
+
+'
+    Range("A2").Select
+    Selection.PasteSpecial Paste:=xlPasteValuesAndNumberFormats, Operation:= _
+        xlNone, SkipBlanks:=False, Transpose:=False
+End Sub
+
+
+Sub RemoveRtns()
+    
+    Dim cel As Range
+    For Each cel In Sheets("Rawdata").Range("1:1")
+        cel = Replace(cel, Chr(10), " ")
+    Next
+End Sub
+
+
+Sub Macro3()
+'
+' Macro3 Macro
+'
+
+'
+    Range("A5:W11014").AdvancedFilter Action:=xlFilterInPlace, CriteriaRange:= _
+        Range("Sheet1!Criteria"), Unique:=False
+    Range("A6").Select
+End Sub
+
+Sub Macro4()
+'
+' Macro4 Macro
+'
+
+'
+    Range("A6").Select
+    Range(Selection, Selection.End(xlDown)).Select
+    Rows("6:11008").Select
+    Selection.SpecialCells(xlCellTypeVisible).Select
+    Selection.Delete shift:=xlUp
+    ActiveSheet.ShowAllData
+    Range("A5").Select
+End Sub
+
+
+Sub ListFiles()
+Dim fNameAndPath As Variant, wb As Workbook, ws As Worksheet
+Dim MyFolder As String
+Dim MyFile As Variant
+
+    fNameAndPath = Application.GetOpenFilename(FileFilter:="Excel Files (*.xlsx), *.xlsx", Title:="Select File To Be Opened", MultiSelect:=True)
+    If Not IsArray(fNameAndPath) Then Exit Sub
+    
+    If fNameAndPath = False Then
+        MsgBox "Kindly select a file"
+        Exit Sub
+    End If
+    For Each MyFile In fNameAndPath
+        Set wb = Workbooks.Open(MyFile)
+        
+        
+        
+        ' do stuff with workbook that has been opened
+        
+        wb.Close savechanges:=False
+        
+    Next MyFile
+    
+End Sub
+
+
+Sub converttable()
+Dim wb As Workbook
+Dim sh3 As Worksheet
+Dim rng As Range
+Set wb = ThisWorkbook
+Set sh3 = wb.Sheets("CRTdata")
+
+sh3.AutoFilterMode = False
+sh3.Cells.ClearFormats
+For Each obj In sh3.ListObjects
+    obj.Unlist
+Next
+
+ary1 = Array("N/A", "#N/A")
+sh3.Range("D:D", "I:I").Replace what:=ary1, replacement:=0, SearchOrder:=xlByColumns, MatchCase:=True
+
+'sh3.ListObjects.Add(xlSrcRange, Range([A1].End(xlDown), [A1].End(xlToRight)), , xlYes).Name = "CRTable"
+'Set tblCRT = sh3.ListObjects("CRTable")
+'
+'
+'With tblCRT
+'    .TableStyle = ""
+'End With
+End Sub
+
+
+Sub demo()
+With ActiveSheet
+Set rndata = .UsedRange
+ActiveSheet.AutoFilterMode = False
+With rndata
+.AutoFilter Field:=24, Criteria1:="Lloyds Int Inst 1"
+'.Select
+Rowz = rndata.Columns(1).SpecialCells(xlCellTypeVisible).Row.Count
+MsgBox Rowz
+For Each rngarea In .SpecialCells(xlCellTypeVisible).Areas
+lcount = lcount + rngarea.Rows.Count
+Next
+MsgBox lcount - 1
+End With
+End With
+Rowz = ActiveSheet.AutoFilter.Range.Columns(1).SpecialCells(xlCellTypeVisible).Rows.Count
+MsgBox Rowz
+End Sub
+
+
+Sub columnstest()
+Set rndata = Range("A1").CurrentRegion
+rw = Range("A1", Range("A1").End(xlDown)).Select
+rw = Application.WorksheetFunction.Count(rw)
+Rowz = Application.WorksheetFunction.Subtotal(3, Range("A:A"))
+MsgBox Rowz
+End Sub
+
+
+Sub testtt()
+ActiveSheet.AutoFilterMode = False
+End Sub
+
+
+Sub testcolor()
+With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent1
+        .TintAndShade = 0.399975585192419
+        .PatternTintAndShade = 0
+    End With
+End Sub
+
+Sub Macro2()
+'
+' Macro2 Macro
+'
+
+Dim wb As Workbook
+Dim sh1 As Worksheet
+Dim fbrg As Variant
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Payments_data")
+
+lrow = sh1.Range("A" & Rows.Count).End(xlUp).Row
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+
+sh1.Cells(1, lcol + 1).Value = "BankName"
+sh1.Cells(1, lcol + 1).Offset(0, 1).Value = "EL or EFSL"
+fndbn = sh1.Range("1:1").Find(what:="BankName").Offset(1, 0).Address
+fndEL = sh1.Range("1:1").Find(what:="EL or EFSL").Offset(1, 0).Address
+
+
+sp = Mid(fndbn, InStr(1, fndbn, "$") + 1, InStr(2, fndbn, "$") - InStr(1, fndbn, "$") - 1)
+spt = Mid(fndEL, InStr(1, fndEL, "$") + 1, InStr(2, fndEL, "$") - InStr(1, fndEL, "$") - 1)
+
+sh1.Range(fndbn & ":" & sp & lrow).FormulaR1C1 = "=IFERROR(IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",RC5=RC10,ISNUMBER(RC5),ISNUMBER(RC10),RC16=""GBP""),""Lloyds"",IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")<>""HSBC"",RC5<=4),""Lloyds to Others"",IF(VLOOKUP(RC6,Process!C32:C33,2,0)=IFERROR(VLOOKUP(RC11,Proces" & _
+        "s!C32:C33,2,0),""""),VLOOKUP(RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0)&"" to Others""))),""Sortcode Notmatch"")" & _
+        ""
+sh1.Range(fndEL & ":" & spt & lrow).FormulaR1C1 = "=IF(AND(IFNA(VLOOKUP(RC6,Process!C26,1,0),FALSE),IFNA(VLOOKUP(RC7,Process!C27,1,0),FALSE)),""Yes"",IF(COUNTIF(RC6:RC6,""Citi*""),""Yes"",""No""))"
+
+'sh1.Range(fndbn & ":" & fndEL & lrow).Copy
+'sh1.Range(fndbn & ":" & fndEL).PasteSpecial Paste:=xlPasteValues
+sh1.Range(Cells(2, lcol + 1), Cells(lrow, lcol + 2)).Copy
+sh1.Range(fndbn).PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+ 
+'    Range("Z2").Select
+'    ActiveCell.FormulaR1C1 = _
+'        "=IF(IFERROR(VLOOKUP(RC6,Process!C32:C33,2,0),"""")=IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),""""),VLOOKUP(RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0 )& "" to Others"")"
+'    Range("Z3").Select
+End Sub
+
+Sub Macro6()
+'
+' Macro6 Macro
+'
+
+'
+    Selection.ClearContents
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",RC5=RC10),""Lloyds"",IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")<>""HSBC"",RC[-22]<=4),""Lloyds to Others"",IF(VLOOKUP(RC6,Process!C32:C33,2,0)=IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),""""),VLOO" & _
+        "KUP(RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0)&"" to Others""))),""Sordcode Notmatch"")" & _
+        ""
+    Range("AA3").Select
+End Sub
+Sub Macro7()
+'
+' Macro7 Macro
+'
+
+'
+    Selection.ClearContents
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",RC5=RC10),""Lloyds"",IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")<>""HSBC"",RC5<=4),""Lloyds to Others"",IF(VLOOKUP(RC6,Process!C32:C33,2,0)=IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),""""),VLOOKUP(" & _
+        "RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0)&"" to Others""))),""Sordcode Notmatch"")" & _
+        ""
+    Range("Z3").Select
+End Sub
+
+Sub Macro11()
+'
+' Macro11 Macro
+'
+
+'
+    Selection.ClearContents
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",RC5=RC10,ISNUMBER(RC5),ISNUMBER(RC10)),""Lloyds"",IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")<>""HSBC"",RC5<=4),""Lloyds to Others"",IF(VLOOKUP(RC6,Process!C32:C33,2,0)=IFERROR(VLOOKUP(RC11,Proces" & _
+        "s!C32:C33,2,0),""""),VLOOKUP(RC6,Process!C32:C33,2,0),VLOOKUP(RC6,Process!C32:C33,2,0)&"" to Others""))),""Sordcode Notmatch"")" & _
+        ""
+    Range("AA3").Select
+End Sub
+
+Sub Macro10()
+'
+' Macro10 Macro
+'
+
+'
+    Selection.ClearContents
+    ActiveCell.FormulaR1C1 = _
+        "=IF(AND(IFNA(VLOOKUP(RC6,Process!C26,1,0),FALSE),IFNA(VLOOKUP(RC7,Process!C27,1,0),FALSE)),""Yes"",IF(COUNTIF(RC6:RC6,""Citi*""),""Yes"",""No""))"
+    Range("AA3").Select
+End Sub
+
+Sub Macro12()
+'
+' Lloyds other bank details find
+'
+
+'
+    Selection.ClearContents
+    ActiveCell.FormulaR1C1 = _
+        "=IF(AND(VLOOKUP(RC6,Process!C32:C33,2,)=""Lloyds"",IFERROR(VLOOKUP(RC11,Process!C32:C33,2,0),"""")=""Lloyds"",OR(ISNUMBER(RC5),ISNUMBER(RC10))),""Lloyds to Others"")"
+    Range("AD3").Select
+End Sub
+
+
+Sub sheetsfind()
+Dim sh3 As Worksheet
+Dim sh4 As Worksheet
+Dim wb As Workbook
+Dim Rg As Range
+Dim ws As Worksheet
+
+Set wb = ThisWorkbook
+Set sh3 = wb.Sheets("CRTdata")
+Set sh4 = wb.Sheets("Home")
+
+sh3.AutoFilterMode = False
+fndsht = sh3.Range("1:1").Find(what:="Client Names", LookIn:=xlValues).Column
+path = sh4.Range("H17").Value
+fdrg = sh3.Range("1:1").Find(what:="Client Names", LookIn:=xlValues).Address
+clintrg = Left(Replace(fdrg, "$", ""), Len(Replace(fdrg, "$", "")) - 1)
+'Set Rg = sh3.Range("a1").CurrentRegion
+
+'sh3.Range(Cells(1, fndsht), Cells(1, fndsht)).EntireColumn.Select
+Set opnwb = Workbooks.Open(path)
+
+For Each ws In opnwb.Sheets
+    'MsgBox ws.Name
+    sh3.Activate
+    fndshtname = Application.WorksheetFunction.IfError(Application.Match(ws.Name, sh3.Range(clintrg & ":" & clintrg), 0), 0)
+    If fndshtname > 1 Then
+        'opnwb.Sheets(ws).Activate
+        shname = ws.Name
+        opnwb.Sheets(shname).Select
+        opnwb.Sheets(shname).Cells(7, 2).Copy
+    Set Rg = sh3.Range("a1").CurrentRegion
+    With Rg
+        .AutoFilter Field:=fndsht, Criteria1:=shname, Operator:=xlFilterValues
+        'rw = .Range("A:A").SpecialCells(xlCellTypeVisible).Rows.Count
+        rw = Application.WorksheetFunction.Subtotal(3, sh3.Range("A:A")) - 1
+    '    On Error Resume Next
+    '    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+    '    On Error GoTo 0
+    End With
+        
+    End If
+    
+Next
+sh4.Activate
+
+
+End Sub

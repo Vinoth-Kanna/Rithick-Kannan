@@ -1,0 +1,1358 @@
+Bad
+Option Explicit
+Sub Bad_PrintLetter()
+Dim lp As Integer
+Dim lrow As Integer, lrows As Long
+Dim lcol As Integer, r As Long
+Dim sh1 As Worksheet
+Dim sh2 As Worksheet
+Dim sh3 As Worksheet
+Dim lastcol As Integer
+Dim sh4 As Worksheet, txt As String
+Dim myrange As Range, Rg As Range
+Dim lastrw As Long, i As Long, j As Long
+Dim f
+Dim rr As Long, rrr As Long
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+Set sh1 = ThisWorkbook.Sheets("Print Letter")
+Set sh2 = ThisWorkbook.Sheets("ESSDR")
+Set sh3 = ThisWorkbook.Sheets("MailMerge")
+Set sh4 = ThisWorkbook.Sheets("Summary")
+
+sh3.Activate
+sh3.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).ClearContents
+sh1.UsedRange.Clear
+sh2.AutoFilterMode = False
+
+'Separate Bad Leaver Names
+lastrw = sh2.Range("a1048576").End(xlUp).Row
+Sheets("Process_Type").Range("FC1").Value = "BAD"
+'If sh4.Range("M21").Value = "All" Then
+
+    With sh2.Range("1:1")
+    .AutoFilter Field:=28, Criteria1:=Array("7", "11", "13", "14", "17"), Operator:=xlFilterValues
+    .Range("a1:a" & lastrw).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+    sh1.Range("a1").PasteSpecial
+    Application.CutCopyMode = False
+    sh2.AutoFilterMode = False
+    End With
+   
+  
+   'check the three year rules
+sh1.AutoFilterMode = False
+
+Dim MyRng As Range
+Dim Findcell As Range
+
+txt = sh4.Range("M12").Value
+
+Set MyRng = ThisWorkbook.Sheets("Process_Type").Range("BG:BG")
+Set Findcell = MyRng.Find(What:=txt)
+
+If Not Findcell Is Nothing Then
+'If txt = "National Grid plc" Or txt = "Hiscox Ltd" Or txt = "AstraZeneca PLC" Or _
+'txt = "Wm Morrison Supermarkets PLC" Or txt = "Next plc" Or txt = "Rotork plc" Or txt = "Barratt Developments PLC" Or txt = "Dechra Pharmaceuticals PLC" Or _
+'txt = "Moneysupermarket.com Group PLC" Or txt = "Kier Group plc" Or txt = "CVS Group plc" Or txt = "HOTEL CHOCOLAT GROUP LTD" Or txt = "Bellway plc" Then
+Set Rg = sh1.Range("a1").CurrentRegion
+
+    With Rg
+    .AutoFilter Field:=41, Criteria1:="<>0", Operator:=xlFilterValues
+    On Error Resume Next
+    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    On Error GoTo 0
+    sh1.AutoFilterMode = False
+    End With
+    
+End If
+        
+    ''Removed the Bad leaver columns based on cancell & early exercise, maturity
+    lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    r = lrows
+
+    Do Until r = 1
+        
+        Set f = sh1.Range("AD" & r)
+        If f <> "" Then
+                sh1.Range("AD" & r).EntireRow.Delete
+        End If
+        r = r - 1
+        
+    Loop
+    
+    
+    lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    rr = lrows
+
+    Do Until rr = 1
+        
+        Set f = sh1.Range("AH" & rr)
+        If f <> "" Then
+                sh1.Range("AH" & rr).EntireRow.Delete
+        End If
+        rr = rr - 1
+        
+    Loop
+    
+    lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    rrr = lrows
+
+    Do Until rrr = 1
+        
+        Set f = sh1.Range("AN" & rrr)
+        If f <> "" Then
+                sh1.Range("AN" & rrr).EntireRow.Delete
+        End If
+        rrr = rrr - 1
+        
+    Loop
+    
+    
+    If sh1.Range("E2").Value = "" Then
+        MsgBox Sheets("Process_Type").Range("FC1") & " Leaver details not found, Kindly check the clinet data files and ESSDR sheet", vbCritical
+        sh2.Activate
+        Exit Sub
+    End If
+    
+'    Else
+    
+    'Individual Separate Bad Leaver Names
+'    If lastrw = 1 Then
+'
+'        MsgBox "There are no ESSDR data", vbInformation
+'        Else
+'        With sh2.Range("1:1")
+'        .AutoFilter Field:=7, Criteria1:=sh4.Range("M21").Value, Operator:=xlFilterValues
+'        .Range("a1:a" & lastrw).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+'        sh1.Range("a1").PasteSpecial
+'        Application.CutCopyMode = False
+'        End With
+'
+'    End If
+'
+'End If
+
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+
+Set myrange = sh1.Range("1:1")
+
+'Bad Leaver heading replace the as per Mailmerge formate
+For i = 1 To lcol
+
+    myrange.Replace What:=sh1.Cells(1, i).Value, replacement:=Sheets("Process_Type").Cells(1, i + 4).Value, Searchformat:=True
+
+Next i
+
+lrow = sh1.Cells(Rows.Count, 1).End(xlUp).Row
+lcol = sh3.Cells(1, Columns.Count).End(xlToLeft).Column
+
+'Printed the Bad Leaver names in mailmerge format
+'If sh4.Range("M21").Value = "All" Then
+
+For lp = 2 To lrow
+    
+    For j = 1 To lcol
+        
+        sh3.Cells(lp, j).Value = "=IFERROR(IFERROR(HLOOKUP(R1C,'Print Letter'!C1:C42,MATCH('Print Letter'!RC3,'Print Letter'!C3,0),0),VLOOKUP(Summary!R12C13,Process_Type!C54:C57,MATCH(R1C,Process_Type!R1C54:R1C57,0),0)),"""")"
+        If sh3.Cells(lp, j).Value = 0 Then
+            sh3.Cells(lp, j).Value = ""
+        End If
+        
+        
+    Next j
+
+Next lp
+    
+'    Else
+'
+'    For j = 1 To lcol
+'
+'        sh3.Cells(2, j).Value = "=IFERROR(IFERROR(HLOOKUP(R1C,'Print Letter'!C1:C42,MATCH('Print Letter'!RC3,'Print Letter'!C3,0),0),VLOOKUP(Summary!R12C13,Process_Type!C54:C57,MATCH(R1C,Process_Type!R1C54:R1C57,0),0)),"""")"
+'
+'    Next j
+    
+'End If
+
+sh3.Cells.Copy
+sh3.Cells.PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+sh2.AutoFilterMode = False
+
+sh1.Visible = xlSheetVisible
+
+ThisWorkbook.Sheets("Summary").Select
+
+Call Mailmerge_Data
+
+MsgBox "Bad Leaver data successfully updated!", vbInformation
+
+
+Application.DisplayAlerts = True
+
+Application.DisplayAlerts = True
+Application.ScreenUpdating = True
+
+End Sub
+
+Option Explicit
+Sub Leaver_Letter()
+Dim Rg As Range
+Dim lastrw As Integer
+Dim wb As Workbook, wrk As Workbook
+Dim ws As Worksheet
+Dim Fstfilepath As Variant
+Dim Secfilepath As Variant
+Dim Source_one As String
+Dim file_n As Object
+Dim cancel As Boolean
+Dim l As Integer
+Dim Rng As Range
+Dim fso As Object
+Dim Fpath As String
+Dim sh1 As Worksheet, sh2 As Worksheet, sh3 As Worksheet, sh4 As Worksheet, sh5 As Worksheet
+Dim lastcl As Long, sh6 As Worksheet
+Dim j As Long, essdrlrow As Long
+Dim fnd
+Dim fnd2 As Range
+Dim mypath As String, filepath As String
+Dim lrow As Long, i As Long
+Dim f
+Dim F_name As String, splittxt As String
+Dim F_name1 As String, txt As String
+
+With Application
+.ScreenUpdating = False
+.DisplayAlerts = False
+End With
+
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Good Leaver")
+Set sh2 = wb.Sheets("Bad Leaver")
+Set sh3 = wb.Sheets("Client Data")
+Set sh4 = wb.Sheets("ESSDR")
+Set sh5 = wb.Sheets("Summary")
+Set sh6 = wb.Sheets("Process_Type")
+
+Call Clearcells
+
+'Select the client data
+
+Fstfilepath = Application.GetOpenFilename(FileFilter:="Excel Files (*.xlsx),*.xlsx", Title:="Select leaver file")
+
+If Fstfilepath <> False Then
+    Workbooks.Open Fstfilepath, ReadOnly:=True
+    Else
+    MsgBox "Kindly select a file and Try Again!"
+    Exit Sub
+End If
+
+
+Fstfilepath = ActiveWorkbook.Name
+Dim Actwrk_Name As String
+Actwrk_Name = ActiveWorkbook.Path
+sh6.Range("FF1").Value = Actwrk_Name
+ActiveWorkbook.Sheets(1).Select
+Range("A1:V1" & Range("a1048576").End(xlUp).Row).Copy
+
+ThisWorkbook.Activate
+sh3.Activate
+
+Range("a1").PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+Workbooks(Fstfilepath).Close
+
+'Folder box Initialise for ESSDR
+Secfilepath = Application.GetOpenFilename(FileFilter:="Excel Files (*.csv),*.csv", Title:="Select ESSDR")
+
+If Secfilepath <> False Then
+    Workbooks.Open Secfilepath, ReadOnly:=True
+    Else
+    MsgBox "Please select a file and Try Again!"
+    Exit Sub
+End If
+
+Secfilepath = ActiveWorkbook.Name
+ActiveWorkbook.Sheets(1).Select
+Dim ESSDRFind As Range
+Set ESSDRFind = Range("A:A").Find(What:="ClientParameter", LookIn:=xlValues, LookAt:=xlWhole)
+
+If Not ESSDRFind Is Nothing Then
+    ESSDRFind.Activate
+    F_name = StrConv(ESSDRFind.Offset(1, 0).Value, vbProperCase)
+    'F_name = Range("A2").Value
+    Else
+    sh5.Activate
+    Range("M12").Select
+    MsgBox "Selected client name couldn't found in Employee Share Scheme Detail Report.", vbCritical
+    Workbooks(Secfilepath).Close False
+    Exit Sub
+End If
+
+F_name1 = StrConv(sh5.Range("M12").Value, vbProperCase)
+
+If F_name = F_name1 Then
+    sh5.Activate
+    Else
+    splittxt = Right(F_name, Len(F_name) - InStr(1, F_name, " ", vbTextCompare))
+
+        If splittxt <> F_name1 Then
+            sh5.Activate
+            Range("M12").Select
+            MsgBox "Kindly check the client name in summary sheet, It's should be the respective client name.", vbCritical
+            Workbooks(Secfilepath).Close False
+            Exit Sub
+        End If
+
+End If
+
+Workbooks.Open (Secfilepath)
+Set Rng = Range("A:A").Find(What:="Period", LookIn:=xlValues, LookAt:=xlWhole, SearchDirection:=xlPrevious)
+Rng.Activate
+Rng.Offset(-1, 0).Select
+Range("1:" & ActiveCell.Row).Delete shift:=xlUp
+
+Range("A1:gk" & Range("a1048576").End(xlUp).Row).Copy
+wb.Activate
+
+sh4.Range("a1").PasteSpecial Paste:=xlPasteValues
+
+If sh4.Range("a1").Value = "" Then
+    MsgBox "Kindly check the values"
+End If
+
+'ESSR replace the columns heading name and removed
+
+lastcl = sh4.Cells(1, Columns.Count).End(xlToLeft).Column
+For j = 1 To lastcl
+    fnd = sh4.Cells(1, j).Value
+    On Error Resume Next
+    Set fnd2 = Sheets("Process_Type").Range("A:A").Find(What:=fnd, LookIn:=xlValues, LookAt:=xlWhole)
+    On Error GoTo 0
+        If fnd2 Is Nothing Then
+        sh4.Cells(1, j).EntireColumn.Delete
+        j = j - 1
+        End If
+Next j
+
+Application.CutCopyMode = False
+Workbooks(Secfilepath).Close
+
+l = 2
+
+'ESSDR sheets needs column added and updated the formulas
+
+sh4.Activate
+Range("B1").Select
+Selection.EntireColumn.Insert shift:=xlToRight
+Selection.Value = "Client PURN"
+sh4.Range("G1").Select
+Selection.EntireColumn.Insert shift:=xlToRight
+Selection.Value = "Full Name"
+Range("AP1").Value = "Last Contribution Date"
+
+essdrlrow = sh4.Range("A1048576").End(xlUp).Row
+
+    sh4.Range("B2:B" & essdrlrow).FormulaR1C1 = "=VLOOKUP(RC[-1],'Client Data'!C1,1,0)"
+    sh4.Range("G2:G" & essdrlrow).FormulaR1C1 = "=CONCATENATE(RC[-3],"" "",RC[-2],"" "",RC[-1])"
+    sh4.Range("AP2:AP" & essdrlrow).Formula = "=TEXT(DATE(YEAR(RC[-18]),MONTH(RC[-18]),""01""),""DD MMMM YYYY"")"
+    
+    
+sh4.Cells.Copy
+sh4.Cells.PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+'Filter and removed the Not applicable values
+If sh4.Range("a1").AutoFilter = False Then
+
+    sh4.Range("a1").AutoFilter
+    Else
+    With Range("1:1")
+    .AutoFilter Field:=2, Criteria1:="#N/A"
+    .Offset(1, 0).Resize(Rows.Count - 1).SpecialCells _
+    (xlCellTypeVisible).EntireRow.Delete
+    End With
+    
+End If
+
+sh4.AutoFilterMode = False
+
+'Sorted the entire cells from column name base & delete leavers maritudate based
+Dim rrg As Range, r As Long
+Dim rfnd As Variant, irow As Long
+
+irow = sh4.Range("A" & Rows.Count).End(xlUp).Row
+Set rrg = sh4.Range("a1").Resize(Rows.Count, Columns.Count)
+
+r = irow
+Do Until r = 1
+
+If sh4.Range("W" & r).Value < sh4.Range("AA" & r).Value Then
+    sh4.Range("W" & r).EntireRow.Delete
+End If
+r = r - 1
+Loop
+
+
+
+'Number format change to date formate respective columns
+essdrlrow = sh4.Range("A1048576").End(xlUp).Row
+
+Dim c As Range
+For Each c In sh4.Range("S2:S" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("T2:T" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("W2:W" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("X2:X" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("Y2:Y" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("AA2:AA" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("AD2:AD" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("AL2:AL" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+For Each c In sh4.Range("AN2:AN" & essdrlrow)
+    c.NumberFormat = "@"
+    c.Value = Format(c.Value, "DD MMMM YYYY")
+Next c
+
+Range("A:A").NumberFormat = "00000000000"
+
+'Removes Cancelled and Excercised Values
+
+lastrw = sh4.Range("a1048576").End(xlUp).Row
+Set Rg = sh4.Range("a1").CurrentRegion
+If lastrw = 1 Then
+
+    MsgBox "There are no ESSDR data", vbInformation
+    Else
+    With Rg
+    .AutoFilter Field:=39, Criteria1:="<>0", Operator:=xlFilterValues
+    On Error Resume Next
+    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    On Error GoTo 0
+    End With
+    
+End If
+
+sh4.Range("a1").AutoFilter
+
+'Exercised Options
+
+If lastrw = 1 Then
+    
+    MsgBox "There are no ESSDR data", vbInformation
+    Else
+    With sh4.Range("1:1")
+    .AutoFilter Field:=33, Criteria1:="<>0", Operator:=xlFilterValues
+    '.Offset(1, 0).Resize(Rows.Count - 1).SpecialCells _
+    (xlCellTypeVisible).EntireColumn.Delete
+    On Error Resume Next
+    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    On Error GoTo 0
+    sh4.Range("a1").AutoFilter
+    End With
+    
+End If
+
+
+'Add the Good Laever
+
+lastrw = sh4.Range("a1048576").End(xlUp).Row
+
+If lastrw = 1 Then
+
+    MsgBox "There are no ESSDR data", vbInformation
+    Else
+    With sh4.Range("1:1")
+    .AutoFilter Field:=28, Criteria1:=Array("1", "2", "3", "4", "8", "9", "10", "12", "15", "16"), Operator:=xlFilterValues
+    '.Offset(1, 0).Resize(Rows.Count - 1).SpecialCells _
+    (xlCellTypeVisible).Copy
+    .Range(Cells(lastrw, 1), Cells(1, Columns.Count).End(xlToLeft)).SpecialCells(xlCellTypeVisible).Copy
+    sh1.Range("a1").PasteSpecial
+    sh4.Application.CutCopyMode = False
+    sh4.AutoFilterMode = False
+    End With
+    
+End If
+
+'Removed the good leaver columns based on cancell & early exercise, maturity
+sh1.Activate
+
+lrow = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh1.Range("AD" & i)
+        If f <> "" Then
+                sh1.Range("AD" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+
+
+lrow = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh1.Range("AH" & i)
+        If f <> "" Then
+                sh1.Range("AH" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+
+
+lrow = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh1.Range("AN" & i)
+        If f <> "" Then
+                sh1.Range("AN" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+
+
+sh4.Activate
+'Add the Bad Laever
+lastrw = Range("a1048576").End(xlUp).Row
+
+If lastrw = 1 Then
+
+    MsgBox "There are no ESSDR data", vbInformation
+    Else
+    With sh4.Range("1:1")
+    .AutoFilter Field:=28, Criteria1:=Array("7", "11", "13", "14", "17"), Operator:=xlFilterValues
+    .Range(Cells(lastrw, 1), Cells(1, Columns.Count).End(xlToLeft)).SpecialCells(xlCellTypeVisible).Copy
+    sh2.Range("a1").PasteSpecial
+    sh4.AutoFilterMode = False
+    sh4.Application.CutCopyMode = False
+    End With
+    
+End If
+
+'check three year's rules
+
+Dim MyRng As Range
+Dim Findcell As Range
+
+txt = sh5.Range("M12").Value
+'If txt = "National Grid plc" Or txt = "Hiscox Ltd" Or txt = "AstraZeneca PLC" Or _
+'txt = "Wm Morrison Supermarkets PLC" Or txt = "Next plc" Or txt = "Rotork plc" Or txt = "Barratt Developments PLC" Or txt = "Dechra Pharmaceuticals PLC" Or _
+'txt = "Moneysupermarket.com Group PLC" Or txt = "Kier Group plc" Or txt = "CVS Group plc" Or txt = "HOTEL CHOCOLAT GROUP LTD" Or txt = "Bellway plc" Then
+
+Set MyRng = ThisWorkbook.Sheets("Process_Type").Range("BG:BG")
+Set Findcell = MyRng.Find(What:=txt)
+
+If Not Findcell Is Nothing Then
+'MsgBox "Client name find"
+
+sh2.AutoFilterMode = False
+Dim rngg As Range
+Set rngg = sh2.Range("A1").CurrentRegion
+    With rngg
+    .AutoFilter Field:=41, Criteria1:="<>0", Operator:=xlFilterValues
+     On Error Resume Next
+    .Offset(1, 0).Resize(rngg.Rows.Count - 1, rngg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+    sh1.Range("a1048576").End(xlUp).Offset(1, 0).PasteSpecial
+    On Error GoTo 0
+    sh2.Application.CutCopyMode = False
+    sh2.AutoFilterMode = False
+    End With
+
+
+sh2.Activate
+   
+    With sh2.Range("1:1")
+    .AutoFilter Field:=41, Criteria1:="<>0", Operator:=xlFilterValues
+    On Error Resume Next
+    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Delete
+    On Error GoTo 0
+    sh2.AutoFilterMode = False
+    End With
+
+End If
+
+''Removed the Bad leaver columns based on cancell & early exercise, maturity
+
+sh4.AutoFilterMode = False
+sh2.Activate
+
+lrow = sh2.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh2.Range("AD" & i)
+        If f <> "" Then
+                sh2.Range("AD" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+    
+lrow = sh2.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh2.Range("AH" & i)
+        If f <> "" Then
+                sh2.Range("AH" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+
+
+lrow = sh2.Range("A" & Rows.Count).End(xlUp).Row
+
+    i = lrow
+
+    Do Until i = 1
+
+        Set f = sh2.Range("AN" & i)
+        If f <> "" Then
+                sh2.Range("AN" & i).EntireRow.Delete
+        End If
+        i = i - 1
+
+    Loop
+    
+
+
+Call Leaver_Names
+
+'Folder and filepath created
+Set fso = New FileSystemObject
+Source_one = Left(Fstfilepath, InStr(1, Fstfilepath, ".xlsx") - 1)
+Sheets("Process_Type").Range("FD1").Value = Source_one
+mypath = Actwrk_Name & "\" & Source_one
+
+    If Not fso.FolderExists(mypath) = True Then
+       fso.CreateFolder (mypath)
+    End If
+        
+filepath = mypath & "\" & Source_one & "-Data" & ".xlsx"
+
+'New workbook saved in client data filename
+
+        ThisWorkbook.Sheets(Array("ESSDR", "Client Data", "Good Leaver", "Bad Leaver")).Copy
+        Set wrk = ActiveWorkbook
+        wrk.SaveAs filepath
+        For Each ws In wrk.Sheets
+            ws.Visible = xlSheetVisible
+        Next ws
+        wrk.Save
+        wrk.Close SaveChanges:=True
+
+
+'ThisWorkbook.Sheets(Array("Good Leaver", "Bad Leaver", "Print Letter")).Visible = False
+sh1.Visible = xlSheetHidden
+sh2.Visible = xlSheetHidden
+'Sheets("Print Letter").Visible = xlSheetHidden
+
+Application.CutCopyMode = False
+
+ThisWorkbook.Sheets("Summary").Select
+
+MsgBox "Files has been uploaded Successfully and a copy has been saved!", vbInformation
+
+With Application
+.ScreenUpdating = True
+.DisplayAlerts = True
+End With
+
+End Sub
+
+Sub Clearcells()
+Dim wb As Workbook
+Dim ws1 As Worksheet
+Dim ws2 As Worksheet
+Dim ws3 As Worksheet
+Dim ws4 As Worksheet
+Dim ws5 As Worksheet, ws6 As Worksheet
+'Removed all text and formating
+
+Set wb = ThisWorkbook
+Set ws1 = wb.Sheets("ESSDR")
+Set ws2 = wb.Sheets("Client Data")
+Set ws3 = wb.Sheets("Good Leaver")
+Set ws4 = wb.Sheets("Bad Leaver")
+Set ws5 = wb.Sheets("MailMerge")
+Set ws6 = wb.Sheets("Process_Type")
+
+ws1.AutoFilterMode = False
+ws1.UsedRange.Clear
+
+ws2.AutoFilterMode = False
+ws2.UsedRange.Clear
+
+ws3.AutoFilterMode = False
+ws3.UsedRange.Clear
+
+ws4.AutoFilterMode = False
+ws4.UsedRange.Clear
+
+ws5.Activate
+Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).ClearContents
+
+ws6.Activate
+Range("FC1:FF1").ClearContents
+
+End Sub
+
+
+Sub Open_Folder_FollowHypderlink()
+    Dim strFolderPath As String
+    Dim strfilepath As String
+    Dim wrk As Worksheet
+    Set wrk = ThisWorkbook.Sheets("Process_Type")
+    strFolderPath = wrk.Range("FF1").Value
+    strfilepath = wrk.Range("FD1").Value
+'Open the client source file's folder FollowHyperlink Method:
+
+    If strFolderPath = "" Then
+        MsgBox "Please Generate the Upload Documents", vbInformation
+        Else
+        ThisWorkbook.FollowHyperlink (strFolderPath & "\" & strfilepath)
+    End If
+
+End Sub
+
+
+Sub Leaver_Names()
+Dim wb As Workbook
+Dim sh1 As Worksheet, sh5 As Worksheet
+Dim sh2 As Worksheet, sh3 As Worksheet
+Dim glastrw As Long, g As Integer, b As Integer
+Dim blastrw As Long
+Set wb = ThisWorkbook
+Set sh1 = wb.Sheets("Good Leaver")
+Set sh2 = wb.Sheets("Bad Leaver")
+Set sh3 = wb.Sheets("Client Data")
+Set sh5 = wb.Sheets("Summary")
+sh5.Activate
+
+'update the Good and Bad leaver names in summary sheet
+
+With Range("S12:T500")
+ .ClearContents
+ .Interior.Color = 15131603
+ .Borders.LineStyle = xlNone
+ End With
+
+'Formatting and find the Good leaver name's
+sh1.Activate
+glastrw = sh1.Range("a" & Rows.Count).End(xlUp).Row
+
+For g = 2 To glastrw
+
+    sh5.Activate
+    sh5.Range("S1048576").End(xlUp).Offset(1, 0).Select
+    With ActiveCell
+        .Value = sh1.Range("G" & g).Value
+        .Interior.Pattern = xlNone
+        .Borders.Weight = xlThin
+    End With
+    
+    With ActiveCell.Offset(0, 1)
+        .Value = "Good"
+        .Interior.Pattern = xlNone
+        .Borders.Weight = xlThin
+    End With
+      
+Next g
+
+'Formatting and find the Bad leaver name's
+
+sh2.Activate
+blastrw = sh2.Range("a" & Rows.Count).End(xlUp).Row
+
+For b = 2 To blastrw
+    sh5.Activate
+    sh5.Range("S1048576").End(xlUp).Offset(1, 0).Select
+    
+    With ActiveCell
+        .Value = sh2.Range("G" & b).Value
+        .Interior.Pattern = xlNone
+        .Borders.Weight = xlThin
+    End With
+    
+    With ActiveCell.Offset(0, 1)
+        .Value = "Bad"
+        .Interior.Pattern = xlNone
+        .Borders.Weight = xlThin
+    End With
+ 
+Next b
+sh5.Columns("S:S").EntireColumn.AutoFit
+sh5.Activate
+sh5.Range("M12").Select
+End Sub
+ 
+
+
+Option Explicit
+Sub Good_PrintLetter()
+Dim lp As Integer
+Dim lrow As Integer, lrows As Long
+Dim lcol As Integer, r As Long
+Dim sh1 As Worksheet
+Dim sh2 As Worksheet
+Dim sh3 As Worksheet
+Dim lastcol As Integer
+Dim sh4 As Worksheet
+Dim myrange As Range, Rg As Range
+Dim f
+Dim lastrw As Long, i As Long, j As Long
+Dim rr As Long, rrr As Long
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+Set sh1 = ThisWorkbook.Sheets("Print Letter")
+Set sh2 = ThisWorkbook.Sheets("Good Leaver")
+Set sh3 = ThisWorkbook.Sheets("MailMerge")
+Set sh4 = ThisWorkbook.Sheets("Summary")
+
+
+sh3.Activate
+sh3.Range(Cells(Rows.Count, 1), Cells(2, Columns.Count)).ClearContents
+sh1.UsedRange.Clear
+sh2.AutoFilterMode = False
+
+'Separate Good Leaver Names
+lastrw = sh2.Range("a1048576").End(xlUp).Row
+Sheets("Process_Type").Range("FC1").Value = "GOOD"
+'If sh4.Range("M20").Value = "All" Then
+
+'With sh2.Range("1:1")
+'    .AutoFilter Field:=28, Criteria1:=Array("1", "2", "3", "4", "8", "9", "10", "12", "15", "16"), Operator:=xlFilterValues
+'    .Range("a1:a" & lastrw).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+'    sh1.Range("a1").PasteSpecial
+'    Application.CutCopyMode = False
+'End With
+
+
+sh2.Range("a1:a" & lastrw).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+sh1.Range("a1").PasteSpecial
+
+'Set Rg = sh5.Range("a1").CurrentRegion
+'sh1.AutoFilterMode = False
+'
+'    With Rg
+'    .AutoFilter Field:=41, Criteria1:="<>0", Operator:=xlFilterValues
+'
+'    On Error Resume Next
+'    .Offset(1, 0).Resize(Rg.Rows.Count - 1, Rg.Columns.Count).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+'    sh1.Range("a1048576").End(xlUp).Offset(1, 0).PasteSpecial
+'    On Error GoTo 0
+'
+'    sh4.Application.CutCopyMode = False
+'    End With
+  
+  '''Removed the good leaver columns based on cancell & early exercise, maturity
+lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    r = lrows
+
+    Do Until r = 1
+        
+        Set f = sh1.Range("AD" & r)
+        If f <> "" Then
+                sh1.Range("AD" & r).EntireRow.Delete
+        End If
+        r = r - 1
+        
+    Loop
+  
+  lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    rr = lrows
+
+    Do Until rr = 1
+        
+        Set f = sh1.Range("AH" & rr)
+        If f <> "" Then
+                sh1.Range("AH" & rr).EntireRow.Delete
+        End If
+        rr = rr - 1
+        
+    Loop
+    
+    lrows = sh1.Range("A" & Rows.Count).End(xlUp).Row
+
+    rrr = lrows
+
+    Do Until rrr = 1
+        
+        Set f = sh1.Range("AN" & rrr)
+        If f <> "" Then
+                sh1.Range("AN" & rrr).EntireRow.Delete
+        End If
+        rrr = rrr - 1
+        
+    Loop
+  
+  
+  
+If sh1.Range("E2").Value = "" Then
+        MsgBox Sheets("Process_Type").Range("FC1") & " Leaver details not found, Kindly check the client data files and ESSDR sheet", vbCritical
+        Sheets("ESSDR").Select
+        Exit Sub
+End If
+    
+    
+'    Else
+    'Individual Separate Good Leaver Names
+'    If lastrw = 1 Then
+'        MsgBox "There are no ESSDR data", vbInformation
+'        Else
+'        With sh2.Range("1:1")
+'        .AutoFilter Field:=7, Criteria1:=sh4.Range("M20").Value, Operator:=xlFilterValues
+'        .Range("a1:a" & lastrw).SpecialCells(xlCellTypeVisible).EntireRow.Copy
+'        sh1.Range("a1").PasteSpecial
+'        Application.CutCopyMode = False
+'        End With
+'    End If
+'
+'End If
+
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+
+Set myrange = sh1.Range("1:1")
+
+'Good Leaver heading replace the as per Mailmerge formate
+For i = 1 To lcol
+
+    myrange.Replace What:=sh1.Cells(1, i).Value, replacement:=Sheets("Process_Type").Cells(1, i + 4).Value, Searchformat:=True
+    
+Next i
+
+lrow = sh1.Cells(Rows.Count, 1).End(xlUp).Row
+lcol = sh3.Cells(1, Columns.Count).End(xlToLeft).Column
+
+'Printed the Good Leaver names in mailmerge format
+'If sh4.Range("M20").Value = "All" Then
+
+For lp = 2 To lrow
+
+    For j = 1 To lcol
+        
+        sh3.Cells(lp, j).Value = "=IFERROR(IFERROR(HLOOKUP(R1C,'Print Letter'!C1:C42,MATCH('Print Letter'!RC3,'Print Letter'!C3,0),0),VLOOKUP(Summary!R12C13,Process_Type!C54:C57,MATCH(R1C,Process_Type!R1C54:R1C57,0),0)),"""")"
+        If sh3.Cells(lp, j).Value = 0 Then
+            sh3.Cells(lp, j).Value = ""
+        End If
+        
+    Next j
+
+Next lp
+    
+i = lastrw
+
+Do Until i = 1
+    
+    sh1.Range("R" & i).Value = sh1.Range("R" & i).Value / 100
+    
+    i = i - 1
+    
+Loop
+    
+    
+    
+'    Else
+'
+'    For j = 1 To lcol
+'
+'        sh3.Cells(2, j).Value = "=IFERROR(IFERROR(HLOOKUP(R1C,'Print Letter'!C1:C42,MATCH('Print Letter'!RC3,'Print Letter'!C3,0),0),VLOOKUP(Summary!R12C13,Process_Type!C54:C57,MATCH(R1C,Process_Type!R1C54:R1C57,0),0)),"""")"
+'
+'    Next j
+    
+'End If
+
+sh3.Cells.Copy
+sh3.Cells.PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+sh2.AutoFilterMode = False
+
+sh1.Visible = xlSheetVisible
+ThisWorkbook.Sheets("Summary").Select
+
+Call Mailmerge_Data
+
+MsgBox "Good Leaver data successfully updated!", vbInformation
+
+
+Application.DisplayAlerts = True
+Application.ScreenUpdating = True
+
+End Sub
+
+Option Explicit
+Sub Mailmerge_Data()
+
+Dim lrow As Integer
+Dim wrk As Worksheet
+Dim sh1 As Worksheet
+Dim rngvisiblecell As Range
+Dim lcol As Long
+Dim i As Long, j As Long
+Dim cl
+
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+Set sh1 = Sheets("MailMerge")
+Set wrk = ThisWorkbook.Sheets("MailMerge")
+wrk.AutoFilterMode = False
+lrow = sh1.Range("a" & Rows.Count).End(xlUp).Row
+lcol = sh1.Cells(1, Columns.Count).End(xlToLeft).Column
+
+
+'check and previews columns removed
+sh1.Activate
+If wrk.Cells(1, 1).Value = "File Name" And Cells(1, 2).Value = "Duplicate" Then
+    wrk.Range("A:B").Delete
+End If
+
+wrk.Range("A1").EntireColumn.Insert shift:=xlRight
+wrk.Range("a1").Value = "Duplicate"
+wrk.Range("A1").EntireColumn.Insert shift:=xlRight
+wrk.Range("a1").Value = "File Name"
+
+lcol = wrk.Cells(1, Columns.Count).End(xlToLeft).Column
+lrow = wrk.Range("C" & Rows.Count).End(xlUp).Row
+
+'Duplicate transaction identify and merged Rows, Good or Band Leaver template name's created
+For i = 2 To lrow
+    
+    cl = wrk.Application.WorksheetFunction.CountIf(Range("C:C"), Range("C" & i))
+    
+    If cl = 0 Then Exit For
+    
+        wrk.Cells(i, 1).FormulaR1C1 = "=CONCATENATE(""Template "",RC2,"" schemes "",Process_Type!R1C159,"" leaver"")"
+        wrk.Cells(i, 2).Value = Application.WorksheetFunction.CountIf(Range("C:C"), Range("C" & i))
+    
+    'Duplicate leaver values merged with single rows
+    If cl > 1 Then
+    
+        For j = 1 To 90
+        
+            If wrk.Cells(1, j + 12) = "Prefix" Then Exit For
+            
+                If wrk.Cells(i, j + 12) <> "" Then
+                'MsgBox "found"
+                
+                wrk.Range(Cells(i + 1, j + 12), Cells(i + (cl - 1), j + 12)).Copy 'Application.WorksheetFunction.Transpose(Cells(i, j + 12).Value2)
+                wrk.Cells(i, j + 12).Offset(0, 1).PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks:=False, Transpose:=True
+                j = j + cl
+                
+            End If
+    Next j
+       
+        
+        With wrk.Range("1:1")
+        .Find(What:="MaturityDate1", LookIn:=xlValues).Select
+        .Range(Cells(i + 1, j + 21), Cells(i + (cl - 1), j + 21)).Copy
+        wrk.Cells(i, j + 21).Offset(0, 1).PasteSpecial Paste:=xlPasteValues, Transpose:=True
+        End With
+        
+        wrk.Range(Cells(i + 1, 2), Cells(i + (cl - 1), 2)).EntireRow.Delete
+    
+    End If
+    
+Next i
+
+wrk.Cells.Copy
+wrk.Cells.PasteSpecial Paste:=xlPasteValues
+Application.CutCopyMode = False
+
+Call MailMerge
+
+ThisWorkbook.Sheets("Summary").Select
+
+
+End Sub
+Option Explicit
+Sub MailMerge()
+
+Dim bCreatedWordInstance As Boolean
+Dim objWord As Word.Application
+Dim objMMMD As Word.Document
+Dim EmployeeName As String
+Dim cDir As String
+Dim cDir1, cDir2 As String
+Dim lastrow As Long
+Dim ThisFileName As String
+Dim SceneName As String
+Dim FName As String
+Dim WIT As String
+Dim ClientFol, WTempName As String
+Dim NewFileName As String
+Dim wrk As Worksheet
+Dim Dname As String
+Dim Clint_Fname As String
+Application.DisplayAlerts = False
+Application.ScreenUpdating = False
+
+Set wrk = ThisWorkbook.Sheets("MailMerge")
+If wrk.Range("D2").Value = "" Then
+    MsgBox Sheets("Process_Type").Range("FC1") & " Leaver details not found, Kindly check the source files", vbCritical
+    Exit Sub
+End If
+wrk.Activate
+'lastrow = Sheets("MailMerge").Range("A" & Rows.Count).End(xlUp).Row
+
+'Gather Information to Name new file
+wrk.Range("D2").Select
+'r = 2
+Do While wrk.Range("a" & ActiveCell.Row) <> ""
+
+EmployeeName = wrk.Range("D" & ActiveCell.Row).Value
+FName = wrk.Range("A" & ActiveCell.Row).Value
+Clint_Fname = Sheets("Process_Type").Range("FF1") 'Date for the folder
+WIT = Sheets("Process_Type").Range("FD1") 'Date for the folder
+ClientFol = "Templates"
+
+'ThisWorkbook.Save
+Dname = Sheets("Process_Type").Range("FC1")
+SceneName = StrConv(Dname & " Leaver", vbProperCase) 'Good Leaver or Bad Leaver
+
+' Setup filenames
+'Const WTempName = "letter.docx" 'This is the 07/10 Word Templates name,  Change as req'dMail Merge letter.doc
+WTempName = Sheets("MailMerge").Range("A" & ActiveCell.Row).Value 'This is the  Word Templates name,  Change as req'd
+NewFileName = EmployeeName & "-" & SceneName & ".docx" 'This is the New Word Documents File Name, Change as req'd"
+
+' Setup directories (letter save path)
+cDir = Clint_Fname + "\"
+
+'1st folder - Picks the file name
+cDir2 = Clint_Fname + "\" + WIT
+
+If Dir(cDir2, vbDirectory) = "" Then
+
+        MkDir cDir2
+
+End If
+
+'2nd Folder - Creates either good or bad leaver
+
+cDir2 = Clint_Fname + "\" + WIT + "\" + SceneName
+
+
+If Dir(cDir2, vbDirectory) = "" Then
+
+        MkDir cDir2
+
+End If
+
+
+'letter picking path
+cDir1 = Clint_Fname + "\" + ClientFol + "\" + FName
+ThisFileName = ThisWorkbook.Name
+
+
+Sheets("MailMerge").Copy
+ActiveWorkbook.SaveAs Clint_Fname & "\MailMerge.xlsx"
+
+If Range("a1").Value = "File Name" And Range("B1").Value = "Duplicate" Then
+Range("A:B").Delete
+End If
+ActiveWorkbook.Close False
+
+On Error Resume Next
+
+' Create a Word Application instance
+bCreatedWordInstance = False
+Set objWord = GetObject(, "Word.Application")
+
+If objWord Is Nothing Then
+  Err.Clear
+  Set objWord = CreateObject("Word.Application")
+  bCreatedWordInstance = True
+End If
+
+If objWord Is Nothing Then
+    MsgBox "Could not start Word"
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+End If
+
+' Let Word trap the errors
+On Error GoTo 0
+
+' Set to True if you want to see the Word Doc flash past during construction
+objWord.Visible = True
+
+'Open Automate Word Template
+Set objMMMD = objWord.Documents.Open(cDir1 & ".docx", ReadOnly:=False)
+objMMMD.Activate
+
+'Merge the Calculation
+With objMMMD
+
+.MailMerge.OpenDataSource Name:=Clint_Fname & "\MailMerge.xlsx", sqlstatement:="SELECT *  FROM `MailMerge$`"   ' Set this as required
+
+With objMMMD.MailMerge  'With ActiveDocument.MailMerge
+
+'totalRecord = .DataSource.RecordCount
+'
+'        For recordNumber = 1 To totalRecord
+'
+'            With .DataSource
+'                .ActiveRecord = recordNumber
+'                .FirstRecord = recordNumber
+'                .LastRecord = recordNumber
+'            End With
+
+
+.Destination = wdSendToNewDocument
+.SuppressBlankLines = True
+With .DataSource
+  .FirstRecord = wdDefaultFirstRecord
+  .LastRecord = wdDefaultFirstRecord
+End With
+.Execute Pause:=False
+
+End With
+End With
+
+' Save new file
+objWord.ActiveDocument.SaveAs cDir2 + "\" + NewFileName
+
+' Close the Mail Merge Main Document
+objMMMD.Close SaveChanges:=wdDoNotSaveChanges
+
+Set objMMMD = Nothing
+
+' Close the New Mail Merged Document
+On Error Resume Next
+    objWord.Quit
+On Error GoTo 0
+
+0:
+Set objWord = Nothing
+
+'Next recordNumber
+
+ThisWorkbook.Sheets("MailMerge").Range("a" & ActiveCell.Row).EntireRow.Delete
+
+Loop
+
+'MsgBox SceneName & " Letter(s) is Printed Successfully", vbInformation
+'MsgBox "Mail Merge Documents Successfully  Created", vbInformation
+
+
+End Sub
+
+
+
+
+Option Explicit
+Sub test()
+lastrw = Range("C" & Rows.Count).End(xlUp).Row
+    For i = 2 To lastrw Step 1
+    Range(Cells(i, 1), Rows(2, 1)).Select
+    Next i
+End Sub
+
+Sub teeee()
+Dim sht As Worksheet
+Dim lrow As Long, i As Long
+Dim f
+Set sht = Sheets("Bad Leaver")
+lrow = sht.Range("A" & Rows.Count).End(xlUp).Row
+i = lrow
+Do Until i = 1
+    Set f = Range("AD" & i)
+    'ActiveCell.Value = f
+    If f <> "" Then
+    Range("AD" & i).EntireRow.Delete
+    
+'    If Range("AD" & i) > 0 Then
+        'Range("T" & i).Value = Format(DateSerial(Year(txtvalue), Month(txtvalue), Day(txtvalue)), "DD MMMM YYYY")
+        'Range("AD" & i).EntireRow.Delete
+         'MsgBox "Found"
+'    End If
+    End If
+    i = i - 1
+    
+Loop
+    
+    
+    
+    'lrow = sh2.Range("A" & Rows.Count).End(xlUp).Row
+'
+'    i = lrow
+'
+'    Do Until i = 1
+'
+'        Set f = sh2.Range("AD" & i)
+'        If f <> "" Then
+'                sh2.Range("AD" & i).EntireRow.Delete
+'        End If
+'        i = i - 1
+'
+'    Loop
+    
+End Sub
+
+ 
+ 
+Sub Threeyear_Rus()
+Dim Rng As Range
+Dim Findcell As Range
+Dim sh5 As Worksheet, txt As String
+
+
+Set sh5 = ThisWorkbook.Sheets("Summary")
+txt = sh5.Range("M12").Value
+Set Rng = ThisWorkbook.Sheets("Process_Type").Range("BG:BG")
+Set Findcell = Rng.Find(What:=txt)
+
+If Not Findcell Is Nothing Then
+MsgBox "Client name find"
+Else
+MsgBox "Not found"
+End If
+
+End Sub
